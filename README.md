@@ -4,5 +4,5 @@ For dependencies
 If you are on mac
 >brew install ghostscript
 
-Instructions
->python3 PIC.py ex.treefile ex.fa
+Run Example
+>python3 PIC.py ex1_t1.treefile ex1.fa
