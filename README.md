@@ -15,12 +15,12 @@ Run Example
 
 ├── README.md    
 └── Code/   
-&nbsp;├── config.py    
-&nbsp;├── ex1_t1.tree   
-&nbsp;├── ex1.fa   
-&nbsp;├── phyinc.py   
-&nbsp;├── Regular_logo.pdf   
-&nbsp;└── With_PIC_logo.png   
+&emsp;├── config.py    
+&emsp;├── ex1_t1.tree   
+&emsp;├── ex1.fa   
+&emsp;├── phyinc.py   
+&emsp;├── Regular_logo.pdf   
+&emsp;└── With_PIC_logo.png   
 
 config.py is a configuration file used to save the confirguration from phyinc
 
