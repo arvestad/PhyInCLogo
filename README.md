@@ -9,7 +9,7 @@ If you are on mac
 >brew install ghostscript
 
 Run Example
->python3 PIC.py ex1_t1.treefile ex1.fa
+>python3 phyinc.py ex1_t1.treefile ex1.fa
 
 ## Files Inside
 
