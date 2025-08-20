@@ -13,14 +13,14 @@ Run Example
 
 ## Files Inside
 
-README.md
-Code/
-|-- config.py
-|-- ex1_t1.tree
-|-- ex1.fa
-|-- phyinc.py
-|-- Regular_logo.pdf
-`-- With_PIC_logo
+README.md    
+Code/  
+|-- config.py  
+|-- ex1_t1.tree  
+|-- ex1.fa  
+|-- phyinc.py  
+|-- Regular_logo.pdf  
+`-- With_PIC_logo  
 
 config.py is a configuration file used to save the confirguration from phyinc
 
