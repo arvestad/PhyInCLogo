@@ -12,15 +12,15 @@ Run Example
 >python3 PIC.py ex1_t1.treefile ex1.fa
 
 ## Files Inside
-.
+
 ├── README.md    
 └── Code/   
-    ├── config.py    
-    ├── ex1_t1.tree   
-    ├── ex1.fa   
-    ├── phyinc.py   
-    ├── Regular_logo.pdf   
-    └── With_PIC_logo.png   
+&nbsp;├── config.py    
+&nbsp;├── ex1_t1.tree   
+&nbsp;├── ex1.fa   
+&nbsp;├── phyinc.py   
+&nbsp;├── Regular_logo.pdf   
+&nbsp;└── With_PIC_logo.png   
 
 config.py is a configuration file used to save the confirguration from phyinc
 
