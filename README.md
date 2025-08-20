@@ -13,14 +13,14 @@ Run Example
 
 ## Files Inside
 
-├── README.md    
-└── Code/   
-&emsp;├── config.py    
-&emsp;├── ex1_t1.tree   
-&emsp;├── ex1.fa   
-&emsp;├── phyinc.py   
-&emsp;├── Regular_logo.pdf   
-&emsp;└── With_PIC_logo.png   
+README.md
+Code/
+|-- config.py
+|-- ex1_t1.tree
+|-- ex1.fa
+|-- phyinc.py
+|-- Regular_logo.pdf
+`-- With_PIC_logo
 
 config.py is a configuration file used to save the confirguration from phyinc
 
@@ -34,6 +34,6 @@ Regular_logo.pdf is the output if you run the program on the example files provi
 
 With_PIC_logo.png is the output if you run the program on the example files provided
 
-#License 
+# License 
 
 GPLv3
