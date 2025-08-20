@@ -40,40 +40,6 @@ def export_scores_to_file(scores_str, file_name):
         print("Already exists.")
 
 
-"""
-def convert_matrix_to_scores(matrix):
-    #convert the seq_counter matrix to the format used by pyseqlogo 
-    for c in config.charaters:
-        if sum(config.seq_counter[c]) == 0 or sum(config.seq_counter[c]) == float(0):
-            config.seq_counter.pop(c)
-        elif c == 'X': # removes counts for X in sequnces since it indicates any/unknown
-            config.seq_counter.pop(c)
-        else:
-            config.existing_characters.append(c)
-
-    all_scores = []
-    for i in range(0,config.seq_length):
-        scores = []
-        for c in config.existing_characters:
-            scores.append((str(c),matrix[config.charaters.index(c)][i]))
-        all_scores.append(scores)
-    export_scores_to_file(str(all_scores),'ex1_t3.txt')
-    return all_scores
-
-def convert_count_to_scores(matrix):
-    #convert the count dictionary of original data (sequnces) to the format used by pyseqlogo 
-    all_scores_count = []
-    for i in range(0,config.seq_length):
-        position_scores = []
-        for key, value in matrix.items():
-            position_scores.append((str(key),float(value[i]/config.terminals)))
-        all_scores_count.append(position_scores)
-    export_scores_to_file(str(all_scores_count),'ex1_without.txt')
-    return all_scores_count
-
-"""
-
-
 def convert_matrix_to_array(matrix):
     array = []
     for i in range(0, config.seq_length):
@@ -186,23 +152,6 @@ def PIC_postorder(tree):
     # Save as PNG
     with open("With_PIC_logo.png", "wb") as f:
         f.write(png_formatter(logo_data, logo_format))
-
-    """
-    plt.rcParams['figure.dpi'] = 300
-    fig, axarr = draw_logo(ALL_SCORES1,seq_type='aa', yaxis='probability', colorscheme='hydrophobicity')
-    fig.tight_layout()
-    fig.show()
-    fig.savefig("with_PIC.png")
-    print("with_PIC.png saved")
-    
-
-    plt.rcParams['figure.dpi'] = 300
-    fig, axarr = draw_logo(ALL_SCORES1,data_type='bits',seq_type=config.seq_type, yaxis='bits',colorscheme='hydrophobicity',draw_axis=True)
-    fig.tight_layout()
-    fig.show()
-    fig.savefig("with_PIC_bits.png")
-    print("with_PIC_bits.png saved")
-    """
 
 
 def traverse_postorder(clade):
@@ -367,41 +316,7 @@ def main():
     # print(seq_counter)
     # counts = {'A' : [3,4,5,6], 'C': [2,3,1,1], 'T': [2,1,3,1], 'G': [3,2,1,2]}
     # print(config.seq_counter)
-    """
-    fig, axarr = draw_logo(config.seq_counter, data_type='counts', seq_type= config.seq_type , yaxis='probability', colorscheme='hydrophobicity')
-    fig.tight_layout()
-    fig.show()
-    fig.savefig("without_PIC.png")
-    print("without_PIC.png saved")'
-    """
 
-
-"""
-    plt.rcParams['figure.dpi'] = 300
-    fig, axarr = draw_logo(convert_count_to_scores(config.seq_counter),colorscheme='hydrophobicity',draw_axis=True)
-    fig.tight_layout()
-    fig.savefig("without_PIC_bits.png")
-    print("without_PIC_bits.png saved")
-
-    print("---Done in %s seconds ---" % round(time.time() - start_time))
-
-
-    test = [[('A', 1.0), ('C', 0.0), ('D', 0.0), ('E', 0.0), ('I', 0.0), ('Q', 0.0), ('R', 0.0), ('S', 0.0), ('T', 0.0), ('V', 0.0), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)], 
- [('A', 1.0), ('C', 0.0), ('D', 0.0), ('E', 0.0), ('I', 0.0), ('Q', 0.0), ('R', 0.0), ('S', 0.0), ('T', 0.0), ('V', 0.0), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)],
- [('A', 0.125), ('C', 0.0), ('D', 0.125), ('E', 0.125), ('I', 0.125), ('Q', 0.0), ('R', 0.125), ('S', 0.125), ('T', 0.125), ('V', 0.125), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)],
- [('A', 0.125), ('C', 0.0), ('D', 0.125), ('E', 0.125), ('I', 0.125), ('Q', 0.0), ('R', 0.125), ('S', 0.125), ('T', 0.125), ('V', 0.125), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)],
- [('A', 0.5), ('C', 0.5), ('D', 0.0), ('E', 0.0), ('I', 0.0), ('Q', 0.0), ('R', 0.0), ('S', 0.0), ('T', 0.0), ('V', 0.0), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)],
- [('A', 0.5), ('C', 0.5), ('D', 0.0), ('E', 0.0), ('I', 0.0), ('Q', 0.0), ('R', 0.0), ('S', 0.0), ('T', 0.0), ('V', 0.0), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)],
- [('A', 0.125), ('C', 0.875), ('D', 0.0), ('E', 0.0), ('I', 0.0), ('Q', 0.0), ('R', 0.0), ('S', 0.0), ('T', 0.0), ('V', 0.0), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)],
- [('A', 0.5), ('C', 0.5), ('D', 0.0), ('E', 0.0), ('I', 0.0), ('Q', 0.0), ('R', 0.0), ('S', 0.0), ('T', 0.0), ('V', 0.0), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)],
- [('A', 0.5), ('C', 0.5), ('D', 0.0), ('E', 0.0), ('I', 0.0), ('Q', 0.0), ('R', 0.0), ('S', 0.0), ('T', 0.0), ('V', 0.0), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)],
- [('A', 0.0), ('C', 0.0), ('D', 0.0), ('E', 0.0), ('I', 0.0), ('Q', 0.125), ('R', 0.875), ('S', 0.0), ('T', 0.0), ('V', 0.0), ('N',0.0), ('G',0.0), ('H',0.0), ('L',0.0), ('K',0.0), ('M',0.0), ('F',0.0) ,('P',0.0),('W',0.0) ,('Y',0.0)]]
-    
-    plt.rcParams['figure.dpi'] = 300
-    fig, axarr = draw_logo(test,yaxis='bits',seq_type='aa',colorscheme='chemistry',draw_axis=True)
-    fig.tight_layout()
-    fig.savefig("ex1_t1_new.png")
-"""
 
 if __name__ == "__main__":
     try:
