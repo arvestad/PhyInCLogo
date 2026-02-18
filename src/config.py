@@ -3,7 +3,7 @@ seq_dict = None
 seq_counter = None 
 
 matrix = None
-charaters = set()
+characters = set()
 available_characters = None
 existing_characters = None
 
