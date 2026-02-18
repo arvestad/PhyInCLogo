@@ -1,10 +1,9 @@
-import sys
-import os
-import time
-import math
 import argparse
-import warnings
 import config
+import logging
+import math
+import os
+import sys
 
 import numpy as np
 import matplotlib
@@ -17,7 +16,7 @@ from Bio import Phylo
 from Bio import SeqIO
 
 
-from weblogo import LogoData, LogoOptions, LogoFormat, png_formatter, pdf_formatter
+from weblogo import LogoData, LogoOptions, LogoFormat, formatters as logo_formatters
 from weblogo.seq import (
     generic_alphabet,
     protein_alphabet,
@@ -31,6 +30,58 @@ from weblogo.seq import (
     unambiguous_protein_alphabet,
 )
 
+
+output_formats = ['pdf', 'eps', 'png', 'jpeg', 'gif']
+fineprint = 'Created with PhyInC Logo + WebLogo'
+
+def setup_argparse():
+    # Apply PIC on tree file and corresbond Name-sequnce file, outputs 2 .png file(sequnce logo with and with out applying PIC).
+    parser = argparse.ArgumentParser(
+        description="Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account."
+    ) 
+    parser.add_argument(
+        "tree_filename", type=str, help="Path to the .tree file (newick format)"
+    )
+    parser.add_argument(
+        "seq_filename", type=str,
+        help="Path to the Fasta file. Assumes sequence name in the format of: ETA_STAAU/96-110",
+    )
+    parser.add_argument(
+        "-o", "--outfile", type=str,
+        help="Name of outfile. If this option is not used, it will be inferred from the sequence file. If the filename ends with .pdf, .png, or corresponding to another accepted format, that output format will be chosen.")
+    parser.add_argument(
+        "-f", "--format", choices = output_formats,
+        help=f"Choose an output format, one of {output_formats}. This option is ignored if --outfile is used and a format is given in the filename."
+        )
+    parser.add_argument(
+        "-n", "--no-fineprint", action='store_true',
+        help=f'Do not add a string indicating what software produced the logo ("{fineprint}")'
+    )
+        
+    return parser
+
+
+def output_info(args):
+    """
+    Figure out what file to write logo to and what format to use.
+    Returns the pair `filename`, `formatter` and ensures they make sense together.
+    The formatter converts logo data to a picture.
+    """
+    if args.outfile:
+        outfile = Path(args.outfile)
+        graphics_format = outfile.suffix.strip('.')
+        if not graphics_format:
+            raise ValueError(f'Give your outfile a suffix that determines output format, one of {output_formats}')
+        if not graphics_format in output_formats:
+            raise ValueError(f'"{graphics_format}" is not a valid output format. Use one of {output_formats}.')
+    else:
+        graphics_format = 'pdf'      # Good default
+        if args.format:
+            graphics_format = args.format # If argparse accepted the string, then it is good
+
+        outfile = args.seq_filename + "_logo." + graphics_format
+    return outfile, logo_formatters[graphics_format]
+        
 
 def export_scores_to_file(scores_str, file_name):
     try:
@@ -89,11 +140,14 @@ def add_length(leaf_i, leaf_j):
         return (l * r) / (l + r)
 
 
-def unbifrucating(childs):
-    """For case where a node has more than 2 childs"""
+def enforce_bifurcations(children):
+    """
+    In case the tree has multifurcating nodes, we create bifurcations
+    by adding very short edges.
+    """
     branch_length_temp = []
     seq_matrix_temp = []
-    for child in childs:
+    for child in children:
         branch_length_temp.append(float(child.branch_length))
         seq_matrix_temp.append(config.seq_dict[child])
 
@@ -130,28 +184,29 @@ def unbifrucating(childs):
     return branch_length_temp[0], seq_matrix_temp[0]
 
 
-def PIC_postorder(tree):
-
+def pic_seqlogo(tree, logo_formatter):
+    
     for child in tree.clade:
         traverse_postorder(child)
 
-    result, seq_matrix = unbifrucating(tree.clade)
+    result, seq_matrix = enforce_bifurcations(tree.clade)
 
     array = convert_matrix_to_array(seq_matrix)
-    print(array)
 
     logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
 
     logo_options = LogoOptions()
-    logo_options.title = "With PIC logo"
+    #logo_options.title = "With PIC logo"
+    logo_options.fineprint = fineprint
     logo_options.stack_width = 50  # increase width of each position
     logo_options.stack_height = 100  # increase overall height
 
     logo_format = LogoFormat(logo_data, logo_options)
+    return logo_formatter(logo_data, logo_format)
 
     # Save as PNG
-    with open("With_PIC_logo.png", "wb") as f:
-        f.write(png_formatter(logo_data, logo_format))
+    # with open("With_PIC_logo.png", "wb") as f:
+    #     f.write()
 
 
 def traverse_postorder(clade):
@@ -182,31 +237,32 @@ def traverse_postorder(clade):
             )
             config.seq_dict[clade] = set_seq(clade[0], clade[1])
         if len(clade) > 2:
-            branch_length, seq_matrix = unbifrucating(clade)
+            branch_length, seq_matrix = enforce_bifurcations(clade)
             clade.branch_length = float(clade.branch_length) + branch_length
             config.seq_dict[clade] = seq_matrix
 
 
-def parse_dict(filename, filetype="fasta"):
+def read_sequences(filename, filetype="fasta"):
     """checks length and type of sequnces."""
 
     record_dict = SeqIO.to_dict(SeqIO.parse(filename, filetype))
-    updated_dict = {}
+    seq_dict = {}
 
+    alignment_width = None
     for key, value in record_dict.items():
-        if len(value) != config.seq_length:
-            if config.seq_length == 0:
-                config.seq_length = len(value)
-            else:
+        if len(value) != alignment_width:
+            if alignment_width:
                 raise Exception(
                     "Sequence length from provided fastafile are inconsistent"
                 )
+            else:
+                alignment_width = len(value)
+                config.seq_length = len(value)
 
-        config.charaters.update(set(value.upper()))
+        config.characters.update(set(value.upper()))
+        seq_dict[key] = value
 
-        updated_dict[key] = value
-
-    return updated_dict
+    return seq_dict
 
 
 def find_clades(clade, condition):
@@ -219,38 +275,29 @@ def find_clades(clade, condition):
     return matches
 
 
+def validate_path(filename):
+    path = Path(filename)
+    if not path.is_file():
+        raise FileNotFoundError(f".tree {filename} is not a file.")
+    return path
+
+
 def main():
     # Set up argument parser
-    parser = argparse.ArgumentParser(
-        description="Apply PIC on tree file and corresbond Name-sequnce file, outputs 2 .png file(sequnce logo with and with out applying PIC)."
-    )
-    parser.add_argument(
-        "input_tree", type=str, help="Path to the .tree file (newick format)"
-    )
-    parser.add_argument(
-        "input_fa",
-        type=str,
-        help="Path to the .fa file (fasta format), assumes sequnce name in the format of: ETA_STAAU/96-110",
-    )
-    args = parser.parse_args()
+    ap = setup_argparse()
+    args = ap.parse_args()
 
-    # Validate file paths
-    tree_file = Path(args.input_tree)
-    fa_file = Path(args.input_fa)
+    tree_file = validate_path(args.tree_filename)
+    seq_file = validate_path(args.seq_filename)
 
-    if not tree_file.is_file():
-        raise FileNotFoundError(f".tree {tree_file} does not exist.")
-    if not fa_file.is_file():
-        raise FileNotFoundError(f".fa {fa_file} does not exist.")
-
-    print(f"Processing: {tree_file} and {fa_file}")
+    outfilename, logo_artist = output_info(args) # Infer details before computing
 
     tree = Phylo.read(tree_file, "newick")
     config.terminals = tree.count_terminals()
 
     # config.py to store global variables
-    config.updated_dict = parse_dict(fa_file, "fasta")
-    print("sequnce length = " + str(config.seq_length))
+    config.updated_dict = read_sequences(seq_file, "fasta")
+    logging.info("Alignment width = " + str(config.seq_length))
 
     config.available_characters = [
         unambiguous_dna_alphabet,
@@ -265,7 +312,7 @@ def main():
         generic_alphabet,
     ]
     count = 0
-    current_chracters = "".join(config.charaters)
+    current_chracters = "".join(config.characters)
 
     for guess in config.available_characters:
         if guess.alphabetic(current_chracters):
@@ -275,8 +322,7 @@ def main():
     if config.seq_type == "dna":
         raise Exception("No match")
 
-    print("sequnce type = " + str(config.seq_type))
-    # print(config.updated_dict['ABDA_AEDAE'].seq)
+    logging.info("Sequence type = " + str(config.seq_type))
 
     config.seq_dict = {}  # dictionary for storing sequnce matrix
     config.seq_counter = (
@@ -293,35 +339,30 @@ def main():
             (config.seq_length,), dtype=int
         ).tolist()
 
-    start_time = time.time()
-    PIC_postorder(tree)
+    logo = pic_seqlogo(tree, logo_artist)
+    with open(outfilename, 'wb') as out:
+        out.write(logo)
 
-    array = convert_count_to_array(config.seq_counter)
-    print(array)
+    # array = convert_count_to_array(config.seq_counter)
 
-    logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
+    # logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
 
-    logo_options = LogoOptions()
-    logo_options.title = "without PIC"
-    logo_options.stack_width = 50  # increase width of each position
-    logo_options.stack_height = 100  # increase overall height
+    # logo_options = LogoOptions()
+    # logo_options.title = "without PIC"
+    # logo_options.stack_width = 50  # increase width of each position
+    # logo_options.stack_height = 100  # increase overall height
 
-    logo_format = LogoFormat(logo_data, logo_options)
+    # logo_format = LogoFormat(logo_data, logo_options)
 
     # Save as PNG
-    with open("Regular_logo.pdf", "wb") as g:
-        g.write(pdf_formatter(logo_data, logo_format))
-
-    # print(tree)
-    # print(seq_counter)
-    # counts = {'A' : [3,4,5,6], 'C': [2,3,1,1], 'T': [2,1,3,1], 'G': [3,2,1,2]}
-    # print(config.seq_counter)
+    # with open("Regular_logo.pdf", "wb") as g:
+    #     g.write(pdf_formatter(logo_data, logo_format))
 
 
 if __name__ == "__main__":
     try:
         main()
     except argparse.ArgumentError as e:
-        print(f"Error: {e}")
+        print(f"Error: {e}", file=sys.stderr)
     except FileNotFoundError as e:
-        print(f"Error: {e}")
+        print(f"Error: {e}", file=sys.stderr)
