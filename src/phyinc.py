@@ -1,5 +1,4 @@
 import argparse
-import config
 import logging
 import math
 import os
@@ -15,20 +14,11 @@ from pathlib import Path
 from Bio import Phylo
 from Bio import SeqIO
 
+import phyinc.config
+import phyinc.io
+
 
 from weblogo import LogoData, LogoOptions, LogoFormat, formatters as logo_formatters
-from weblogo.seq import (
-    generic_alphabet,
-    protein_alphabet,
-    nucleic_alphabet,
-    dna_alphabet,
-    rna_alphabet,
-    reduced_nucleic_alphabet,
-    reduced_protein_alphabet,
-    unambiguous_dna_alphabet,
-    unambiguous_rna_alphabet,
-    unambiguous_protein_alphabet,
-)
 
 
 output_formats = ['pdf', 'eps', 'png', 'jpeg', 'gif']
@@ -46,6 +36,10 @@ def setup_argparse():
         "seq_filename", type=str,
         help="Path to the Fasta file. Assumes sequence name in the format of: ETA_STAAU/96-110",
     )
+    parser.add_argument(
+        '-t', '--type',
+        choices=['aa', 'dna', 'rna', 'guess'], default='guess',
+        help="Specify what sequence type to assume. Default: %(default)s")
     parser.add_argument(
         "-o", "--outfile", type=str,
         help="Name of outfile. If this option is not used, it will be inferred from the sequence file. If the filename ends with .pdf, .png, or corresponding to another accepted format, that output format will be chosen.")
@@ -204,15 +198,11 @@ def pic_seqlogo(tree, logo_formatter):
     logo_format = LogoFormat(logo_data, logo_options)
     return logo_formatter(logo_data, logo_format)
 
-    # Save as PNG
-    # with open("With_PIC_logo.png", "wb") as f:
-    #     f.write()
-
 
 def traverse_postorder(clade):
     if len(clade) == 0:  # only tips of the tree will have length 0
         clade.seq = str(
-            config.updated_dict[clade.name].seq
+            config.alignment[clade.name].seq
         )  # store str(sequnces) as an artribute for the clade object(of biopython package).
 
         seq_matrix = config.matrix.copy()  # make a copy of the default sequnce matrix
@@ -242,27 +232,7 @@ def traverse_postorder(clade):
             config.seq_dict[clade] = seq_matrix
 
 
-def read_sequences(filename, filetype="fasta"):
-    """checks length and type of sequnces."""
-
-    record_dict = SeqIO.to_dict(SeqIO.parse(filename, filetype))
-    seq_dict = {}
-
-    alignment_width = None
-    for key, value in record_dict.items():
-        if len(value) != alignment_width:
-            if alignment_width:
-                raise Exception(
-                    "Sequence length from provided fastafile are inconsistent"
-                )
-            else:
-                alignment_width = len(value)
-                config.seq_length = len(value)
-
-        config.characters.update(set(value.upper()))
-        seq_dict[key] = value
-
-    return seq_dict
+        
 
 
 def find_clades(clade, condition):
@@ -293,35 +263,10 @@ def main():
     outfilename, logo_artist = output_info(args) # Infer details before computing
 
     tree = Phylo.read(tree_file, "newick")
-    config.terminals = tree.count_terminals()
 
     # config.py to store global variables
-    config.updated_dict = read_sequences(seq_file, "fasta")
+    config.alignment, config.seq_type = io.read_sequences(seq_file, "fasta", args)
     logging.info("Alignment width = " + str(config.seq_length))
-
-    config.available_characters = [
-        unambiguous_dna_alphabet,
-        unambiguous_rna_alphabet,
-        nucleic_alphabet,
-        dna_alphabet,
-        rna_alphabet,
-        reduced_nucleic_alphabet,
-        unambiguous_protein_alphabet,
-        reduced_protein_alphabet,
-        protein_alphabet,
-        generic_alphabet,
-    ]
-    count = 0
-    current_chracters = "".join(config.characters)
-
-    for guess in config.available_characters:
-        if guess.alphabetic(current_chracters):
-            config.seq_type = guess
-            break
-        count += 1
-    if config.seq_type == "dna":
-        raise Exception("No match")
-
     logging.info("Sequence type = " + str(config.seq_type))
 
     config.seq_dict = {}  # dictionary for storing sequnce matrix
