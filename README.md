@@ -2,25 +2,28 @@
 
 ## PhyInC Logo (pronounced Fink Logo) for short is a tool to take .fa and .tree files to create sequence Logo and save as a .PNG file.
 
-For dependencies
->pip install biopython weblogo matplotlib numpy
+For dependencies, start a virtual env as good practice:
+>python3 -m venv .
+>pip3 install biopython weblogo matplotlib numpy
 
 If you are on mac
 >brew install ghostscript
 
 Run Example
->python3 phyinc.py ex1_t1.treefile ex1.fa
+>python3 src/phyinc.py ex1_t1.treefile ex1.fa
+
+This should create a PDF in the examples folder.
 
 ## Files Inside
 
 README.md    
-Code/  
+src/  
 |-- config.py  
-|-- ex1_t1.tree  
-|-- ex1.fa  
 |-- phyinc.py  
-|-- Regular_logo.pdf  
-`-- With_PIC_logo  
+examples/
+|-- ex1_t1.tree
+|-- ex1.fa
+
 
 config.py is a configuration file used to save the confirguration from phyinc
 
