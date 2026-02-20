@@ -63,7 +63,7 @@ def setup_argparse():
     )
     parser.add_argument(
         "-n",
-        "--no-fineprint",
+        "--no_fineprint",
         action="store_true",
         help=f'Do not add a string indicating what software produced the logo ("{fineprint}")',
     )
@@ -200,7 +200,7 @@ def enforce_bifurcations(children):
     return branch_length_temp[0], seq_matrix_temp[0]
 
 
-def pic_seqlogo(tree, logo_formatter):
+def pic_seqlogo(tree, logo_formatter, no_fine_print):
 
     for child in tree.clade:
         traverse_postorder(child)
@@ -213,7 +213,14 @@ def pic_seqlogo(tree, logo_formatter):
 
     logo_options = LogoOptions()
     # logo_options.title = "With PIC logo"
-    logo_options.fineprint = fineprint
+
+    if no_fine_print:
+        logo_options.show_fineprint = False
+
+    else:
+        # add the fine print
+        logo_options.fineprint = fineprint
+
     logo_options.stack_width = 50  # increase width of each position
     logo_options.stack_height = 100  # increase overall height
 
@@ -361,7 +368,7 @@ def main():
             (config.seq_length,), dtype=int
         ).tolist()
 
-    logo = pic_seqlogo(tree, logo_artist)
+    logo = pic_seqlogo(tree, logo_artist, args.no_fineprint)
     with open(outfilename, "wb") as out:
         out.write(logo)
 
