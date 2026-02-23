@@ -3,6 +3,7 @@ import logging
 import math
 import os
 import sys
+import weblogo  # is this needed?
 
 import numpy as np
 import matplotlib
@@ -21,19 +22,21 @@ import phyinc.io
 from weblogo import LogoData, LogoOptions, LogoFormat, formatters as logo_formatters
 
 
-output_formats = ['pdf', 'eps', 'png', 'jpeg', 'gif']
-fineprint = 'Created with PhyInC Logo + WebLogo'
+output_formats = ["pdf", "eps", "png", "jpeg", "gif"]
+fineprint = "Created with PhyInC Logo + WebLogo"
+
 
 def setup_argparse():
     # Apply PIC on tree file and corresbond Name-sequnce file, outputs 2 .png file(sequnce logo with and with out applying PIC).
     parser = argparse.ArgumentParser(
         description="Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account."
-    ) 
+    )
     parser.add_argument(
         "tree_filename", type=str, help="Path to the .tree file (newick format)"
     )
     parser.add_argument(
-        "seq_filename", type=str,
+        "seq_filename",
+        type=str,
         help="Path to the Fasta file. Assumes sequence name in the format of: ETA_STAAU/96-110",
     )
     parser.add_argument(
@@ -51,7 +54,19 @@ def setup_argparse():
         "-n", "--no-fineprint", action='store_true',
         help=f'Do not add a string indicating what software produced the logo ("{fineprint}")'
     )
-        
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=output_formats,
+        help=f"Choose an output format, one of {output_formats}. This option is ignored if --outfile is used and a format is given in the filename.",
+    )
+    parser.add_argument(
+        "-n",
+        "--no-fineprint",
+        action="store_true",
+        help=f'Do not add a string indicating what software produced the logo ("{fineprint}")',
+    )
+
     return parser
 
 
@@ -63,19 +78,25 @@ def output_info(args):
     """
     if args.outfile:
         outfile = Path(args.outfile)
-        graphics_format = outfile.suffix.strip('.')
+        graphics_format = outfile.suffix.strip(".")
         if not graphics_format:
-            raise ValueError(f'Give your outfile a suffix that determines output format, one of {output_formats}')
+            raise ValueError(
+                f"Give your outfile a suffix that determines output format, one of {output_formats}"
+            )
         if not graphics_format in output_formats:
-            raise ValueError(f'"{graphics_format}" is not a valid output format. Use one of {output_formats}.')
+            raise ValueError(
+                f'"{graphics_format}" is not a valid output format. Use one of {output_formats}.'
+            )
     else:
-        graphics_format = 'pdf'      # Good default
+        graphics_format = "pdf"  # Good default
         if args.format:
-            graphics_format = args.format # If argparse accepted the string, then it is good
+            graphics_format = (
+                args.format
+            )  # If argparse accepted the string, then it is good
 
         outfile = args.seq_filename + "_logo." + graphics_format
     return outfile, logo_formatters[graphics_format]
-        
+
 
 def export_scores_to_file(scores_str, file_name):
     try:
@@ -178,8 +199,8 @@ def enforce_bifurcations(children):
     return branch_length_temp[0], seq_matrix_temp[0]
 
 
-def pic_seqlogo(tree, logo_formatter):
-    
+def pic_seqlogo(tree, logo_formatter, no_fine_print):
+
     for child in tree.clade:
         traverse_postorder(child)
 
@@ -190,8 +211,15 @@ def pic_seqlogo(tree, logo_formatter):
     logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
 
     logo_options = LogoOptions()
-    #logo_options.title = "With PIC logo"
-    logo_options.fineprint = fineprint
+    # logo_options.title = "With PIC logo"
+
+    if no_fine_print:
+        logo_options.show_fineprint = False
+
+    else:
+        # add the fine print
+        logo_options.fineprint = fineprint
+
     logo_options.stack_width = 50  # increase width of each position
     logo_options.stack_height = 100  # increase overall height
 
@@ -260,7 +288,7 @@ def main():
     tree_file = validate_path(args.tree_filename)
     seq_file = validate_path(args.seq_filename)
 
-    outfilename, logo_artist = output_info(args) # Infer details before computing
+    outfilename, logo_artist = output_info(args)  # Infer details before computing
 
     tree = Phylo.read(tree_file, "newick")
 
@@ -279,13 +307,19 @@ def main():
     config.existing_characters = []
 
     # initialize the seq_counter dictionary
-    for i in range(0, len(config.seq_type)):
-        config.seq_counter[config.seq_type[i]] = np.zeros(
+    # length_of_config = len(config.seq_type.letters())
+    # print(length_of_config)
+    # print(type(config.seq_type), config.seq_type)
+    # print(config.seq_type.letters()[1])
+
+    for i in range(0, len(config.seq_type.letters())):
+        # Alphabet object is not subscriptable so you cannot call config.seq_type[i]
+        config.seq_counter[config.seq_type.letters()[i]] = np.zeros(
             (config.seq_length,), dtype=int
         ).tolist()
 
-    logo = pic_seqlogo(tree, logo_artist)
-    with open(outfilename, 'wb') as out:
+    logo = pic_seqlogo(tree, logo_artist, args.no_fineprint)
+    with open(outfilename, "wb") as out:
         out.write(logo)
 
     # array = convert_count_to_array(config.seq_counter)
