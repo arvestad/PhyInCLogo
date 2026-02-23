@@ -10,17 +10,23 @@ For dependencies, start a virtual env as good practice:
 If you are on mac
 >brew install ghostscript
 
+To install the current package:
+> pip3 install .
+
 Run Example
->python3 src/phyinc.py ./examples/ex1_t1.tree ./examples/ex1.fa
+>phyinc ./examples/ex1_t1.tree ./examples/ex1.fa
 
 This should create a PDF in the examples folder.
 
 ## Files Inside
 
-README.md    
-src/  
-|-- config.py  
-|-- phyinc.py  
+README.md
+src/
+|-- phyinc/
+    |-- config.py  
+    |-- phyinc.py  /
+    |-- io.py
+	|-- version.py
 examples/
 |-- ex1_t1.tree
 |-- ex1.fa
