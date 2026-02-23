@@ -13,10 +13,9 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 from Bio import Phylo
-from Bio import SeqIO
 
-import phyinc.config
-import phyinc.io
+import phyinc.config as config
+import phyinc.io as io
 
 
 from weblogo import LogoData, LogoOptions, LogoFormat, formatters as logo_formatters
@@ -40,24 +39,21 @@ def setup_argparse():
         help="Path to the Fasta file. Assumes sequence name in the format of: ETA_STAAU/96-110",
     )
     parser.add_argument(
-        '-t', '--type',
-        choices=['aa', 'dna', 'rna', 'guess'], default='guess',
+        '-t',
+        '--type',
+        choices=['aa', 'dna', 'rna', 'guess'],
+        default='guess',
         help="Specify what sequence type to assume. Default: %(default)s")
     parser.add_argument(
-        "-o", "--outfile", type=str,
+        "-o",
+        "--outfile",
+        type=str,
         help="Name of outfile. If this option is not used, it will be inferred from the sequence file. If the filename ends with .pdf, .png, or corresponding to another accepted format, that output format will be chosen.")
-    parser.add_argument(
-        "-f", "--format", choices = output_formats,
-        help=f"Choose an output format, one of {output_formats}. This option is ignored if --outfile is used and a format is given in the filename."
-        )
-    parser.add_argument(
-        "-n", "--no-fineprint", action='store_true',
-        help=f'Do not add a string indicating what software produced the logo ("{fineprint}")'
-    )
     parser.add_argument(
         "-f",
         "--format",
         choices=output_formats,
+        default="pdf",
         help=f"Choose an output format, one of {output_formats}. This option is ignored if --outfile is used and a format is given in the filename.",
     )
     parser.add_argument(
@@ -65,6 +61,12 @@ def setup_argparse():
         "--no-fineprint",
         action="store_true",
         help=f'Do not add a string indicating what software produced the logo ("{fineprint}")',
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help=f'Write more information to stderr',
     )
 
     return parser
@@ -95,6 +97,7 @@ def output_info(args):
             )  # If argparse accepted the string, then it is good
 
         outfile = args.seq_filename + "_logo." + graphics_format
+
     return outfile, logo_formatters[graphics_format]
 
 
@@ -200,7 +203,6 @@ def enforce_bifurcations(children):
 
 
 def pic_seqlogo(tree, logo_formatter, no_fine_print):
-
     for child in tree.clade:
         traverse_postorder(child)
 
@@ -211,11 +213,9 @@ def pic_seqlogo(tree, logo_formatter, no_fine_print):
     logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
 
     logo_options = LogoOptions()
-    # logo_options.title = "With PIC logo"
 
     if no_fine_print:
         logo_options.show_fineprint = False
-
     else:
         # add the fine print
         logo_options.fineprint = fineprint
@@ -284,6 +284,12 @@ def main():
     # Set up argument parser
     ap = setup_argparse()
     args = ap.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="phyinc: %(message)s",
+        )
 
     tree_file = validate_path(args.tree_filename)
     seq_file = validate_path(args.seq_filename)

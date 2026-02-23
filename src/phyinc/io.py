@@ -1,5 +1,8 @@
+from Bio import SeqIO
+import phyinc.config as config
+
 from weblogo.seq import (
-    generic_alphabet,
+#    generic_alphabet, # I do not want to use the generic alphabet — it allows _everything_
     protein_alphabet,
     nucleic_alphabet,
     dna_alphabet,
@@ -10,10 +13,71 @@ from weblogo.seq import (
     unambiguous_rna_alphabet,
     unambiguous_protein_alphabet,
 )
+nucleotide_alphabets = [
+        unambiguous_dna_alphabet,
+        unambiguous_rna_alphabet,
+        reduced_nucleic_alphabet,
+        dna_alphabet,
+        rna_alphabet,
+        nucleic_alphabet,
+]
+protein_alphabets = [
+        unambiguous_protein_alphabet,
+        reduced_protein_alphabet,
+        protein_alphabet,
+]
+
+def infer_sequence_type(char_set, args):
+
+    # 1. Guess type by comparing the character set with WebLogo alphabets
+    seq_type = None
+    available_alphabets = nucleotide_alphabets + protein_alphabets
+    for alphabet in available_alphabets:
+        if char_set.issubset(set(alphabet)):
+            seq_type = alphabet
+            break               # Found it!
+
+    # 2. If user desires another sequence type, then ensure seqs are compatible
+    if args.type:
+        if args.type == 'dna':
+            pass
+        elif args.type == 'rna':
+            pass
+        elif args.type == 'aa':
+            pass
+        else:
+            pass                # We end up here if == 'guess'
+
+    return seq_type
 
 
+    # Old version:
+    config.available_characters = [
+        unambiguous_dna_alphabet,
+        unambiguous_rna_alphabet,
+        nucleic_alphabet,
+        dna_alphabet,
+        rna_alphabet,
+        reduced_nucleic_alphabet,
+        unambiguous_protein_alphabet,
+        reduced_protein_alphabet,
+        protein_alphabet,
+        generic_alphabet,
+    ]
+    for sigma in config.available_characters:
+        print(f'{type(sigma)}\t {sigma}')
 
-def read_sequences(filename, filetype="fasta", args) -> tuple[dict, Alphabet]:
+    current_characters = "".join(config.characters)
+
+    for guess in config.available_characters:
+        if guess.alphabetic(current_characters):
+            config.seq_type = guess
+            break
+    if config.seq_type == "dna":
+        raise Exception("No match")
+    
+
+def read_sequences(filename, filetype, args):
     """
     Read the input alignment and perform basic length checks.
     Also, determine what kind of bio sequence we read.
@@ -43,37 +107,3 @@ def read_sequences(filename, filetype="fasta", args) -> tuple[dict, Alphabet]:
     return seq_dict, seq_type
 
 
-def infer_sequence_type(char_set, args):
-
-    seq_type = 'dna'           # The default
-    # 1. Guess type by comparing the character set with WebLogo alphabets
-
-    # 2. If user desires another sequence type, then ensure seqs are compatible
-    if args.type:
-        pass
-    else:
-        return seq_type
-
-
-    # Old version:
-    config.available_characters = [
-        unambiguous_dna_alphabet,
-        unambiguous_rna_alphabet,
-        nucleic_alphabet,
-        dna_alphabet,
-        rna_alphabet,
-        reduced_nucleic_alphabet,
-        unambiguous_protein_alphabet,
-        reduced_protein_alphabet,
-        protein_alphabet,
-        generic_alphabet,
-    ]
-    current_chracters = "".join(config.characters)
-
-    for guess in config.available_characters:
-        if guess.alphabetic(current_chracters):
-            config.seq_type = guess
-            break
-    if config.seq_type == "dna":
-        raise Exception("No match")
-    
