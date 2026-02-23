@@ -4,13 +4,14 @@
 
 For dependencies, start a virtual env as good practice:
 >python3 -m venv .
+>source venv/bin/activate
 >pip3 install biopython weblogo matplotlib numpy
 
 If you are on mac
 >brew install ghostscript
 
 Run Example
->python3 src/phyinc.py ex1_t1.treefile ex1.fa
+>python3 src/phyinc.py ./examples/ex1_t1.tree ./examples/ex1.fa
 
 This should create a PDF in the examples folder.
 
