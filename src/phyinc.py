@@ -63,7 +63,7 @@ def setup_argparse():
     )
     parser.add_argument(
         "-n",
-        "--no_fineprint",
+        "--no-fineprint",
         action="store_true",
         help=f'Do not add a string indicating what software produced the logo ("{fineprint}")',
     )
