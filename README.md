@@ -1,10 +1,8 @@
-# Phylogenetically Independent Contrasts Logo
+# PhyInC: Phylogenetically Independent Contrasts Sequence Logo
 
-## Description
-
-PhyInC Logo (pronounced Fink Logo) for short is a tool to take .fa and .tree files to create
-a phylogenetically conditioned sequence logo, using Felsensteins Phylogenetic Independent
-Contrast.
+PhyInC (pronounced "Fink" for short) is a tool to take Fasta files and Newick tree files to create
+a phylogenetically conditioned sequence logo, using Felsensteins _phylogenetic independent
+contrast_ (PIC).
 
 ## Install from PyPI.org
 
