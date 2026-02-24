@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "phyinc"
 description = "Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account"
+version="1.0"
 readme = "README.md"
-authors = [{name = "Haolin Guo"}]
+authors = [{name = "Haolin Guo"}, {name = "Lars Arvestad", email="arve@math.su.se"}]
 maintainers = [{name = "Lars Arvestad", email = "arve@math.su.se"}]
 classifiers = ["License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"]
-dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
 	     "matplotlib",
@@ -19,11 +19,6 @@ dependencies = [
 
 [project.scripts]
 phyinc = "phyinc.phyinc:main"
-
-
-[tool.setuptools.dynamic]
-version = {attr = "phyinc.version.__version__"}
-
 
 [tool.setuptools]
 package-dir = {"" = "src"}
