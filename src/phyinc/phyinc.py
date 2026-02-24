@@ -16,7 +16,7 @@ from Bio import Phylo
 
 import phyinc.config as config
 import phyinc.io as io
-
+from phyinc.colorhelper import decide_color_scheme
 
 from weblogo import LogoData, LogoOptions, LogoFormat, formatters as logo_formatters
 
@@ -39,10 +39,17 @@ def setup_argparse():
         help="Path to the Fasta file. Assumes sequence name in the format of: ETA_STAAU/96-110",
     )
     parser.add_argument(
-        '-t',
-        '--type',
-        choices=['aa', 'dna', 'rna', 'guess'],
-        default='guess',
+        "-c",
+        "--color-scheme",
+        choices=["monochrome", "nucleotide", "base pairing", "hydrophobicity", "chemistry", "charge", "taylor", "guess"],
+        default="guess",
+        help="Choose color scheme. If using 'guess', then sequence type chooses between 'nucleotide' and 'taylor'."
+    )
+    parser.add_argument(
+        "-t",
+        "--type",
+        choices=["aa", "dna", "rna", "guess"],
+        default="guess",
         help="Specify what sequence type to assume. Default: %(default)s")
     parser.add_argument(
         "-o",
@@ -66,7 +73,7 @@ def setup_argparse():
         "-v",
         "--verbose",
         action="store_true",
-        help=f'Write more information to stderr',
+        help=f"Write more information to stderr",
     )
 
     return parser
@@ -160,6 +167,8 @@ def add_length(leaf_i, leaf_j):
 
 def enforce_bifurcations(children):
     """
+    TODO: misleading name! I completely misunderstood Haolin's code.
+
     In case the tree has multifurcating nodes, we create bifurcations
     by adding very short edges.
     """
@@ -202,24 +211,23 @@ def enforce_bifurcations(children):
     return branch_length_temp[0], seq_matrix_temp[0]
 
 
-def pic_seqlogo(tree, logo_formatter, no_fine_print):
+def pic_seqlogo(tree, logo_formatter, color_scheme, args):
     for child in tree.clade:
         traverse_postorder(child)
 
     result, seq_matrix = enforce_bifurcations(tree.clade)
-
     array = convert_matrix_to_array(seq_matrix)
 
     logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
-
     logo_options = LogoOptions()
 
-    if no_fine_print:
+    if args.no_fineprint:
         logo_options.show_fineprint = False
     else:
         # add the fine print
         logo_options.fineprint = fineprint
 
+    logo_options.color_scheme = color_scheme
     logo_options.stack_width = 50  # increase width of each position
     logo_options.stack_height = 100  # increase overall height
 
@@ -299,9 +307,12 @@ def main():
     tree = Phylo.read(tree_file, "newick")
 
     # config.py to store global variables
-    config.alignment, config.seq_type = io.read_sequences(seq_file, "fasta", args)
+    config.alignment, config.seq_type, color_scheme = io.read_sequences(seq_file, "fasta", args)
     logging.info("Alignment width = " + str(config.seq_length))
     logging.info("Sequence type = " + str(config.seq_type))
+
+    color_scheme = decide_color_scheme(args, color_scheme)
+   
 
     config.seq_dict = {}  # dictionary for storing sequnce matrix
     config.seq_counter = (
@@ -324,7 +335,7 @@ def main():
             (config.seq_length,), dtype=int
         ).tolist()
 
-    logo = pic_seqlogo(tree, logo_artist, args.no_fineprint)
+    logo = pic_seqlogo(tree, logo_artist, color_scheme, args)
     with open(outfilename, "wb") as out:
         out.write(logo)
 
