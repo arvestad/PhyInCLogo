@@ -17,18 +17,21 @@ from Bio import Phylo
 import phyinc.config as config
 import phyinc.io as io
 from phyinc.colorhelper import decide_color_scheme
+from importlib.metadata import version
 
 from weblogo import LogoData, LogoOptions, LogoFormat, formatters as logo_formatters
 
 
 output_formats = ["pdf", "eps", "png", "jpeg", "gif"]
 fineprint = "Created with PhyInC Logo + WebLogo"
-
+description_str = """
+Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account.
+"""
 
 def setup_argparse():
     # Apply PIC on tree file and corresbond Name-sequnce file, outputs 2 .png file(sequnce logo with and with out applying PIC).
     parser = argparse.ArgumentParser(
-        description="Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account."
+        description=description_str + f" Version {version('phyinc')}."
     )
     parser.add_argument(
         "tree_filename", type=str, help="Path to the .tree file (newick format)"
@@ -74,6 +77,11 @@ def setup_argparse():
         "--verbose",
         action="store_true",
         help=f"Write more information to stderr",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"phyinc version {version('phyinc')}"
     )
 
     return parser
@@ -308,26 +316,20 @@ def main():
 
     # config.py to store global variables
     config.alignment, config.seq_type, color_scheme = io.read_sequences(seq_file, "fasta", args)
-    logging.info("Alignment width = " + str(config.seq_length))
-    logging.info("Sequence type = " + str(config.seq_type))
+    logging.info(f"Alignment width:  {config.seq_length}")
+    logging.info(f"Sequence type:    {config.seq_type}")
+    logging.info(f"Number of leaves: {tree.count_terminals()}")
 
     color_scheme = decide_color_scheme(args, color_scheme)
-   
 
     config.seq_dict = {}  # dictionary for storing sequnce matrix
     config.seq_counter = (
         {}
-    )  # dictionary storing count matrix as a whole(generate unmodifed sequnce logo)
+    )  # dictionary storing count matrix as a whole(generate unmodifed sequence logo)
     config.matrix = np.zeros(
         (len(config.seq_type), config.seq_length), dtype=float
     )  # a default matrix for each individual leaf/node, to store character counts.
     config.existing_characters = []
-
-    # initialize the seq_counter dictionary
-    # length_of_config = len(config.seq_type.letters())
-    # print(length_of_config)
-    # print(type(config.seq_type), config.seq_type)
-    # print(config.seq_type.letters()[1])
 
     for i in range(0, len(config.seq_type.letters())):
         # Alphabet object is not subscriptable so you cannot call config.seq_type[i]
@@ -338,21 +340,6 @@ def main():
     logo = pic_seqlogo(tree, logo_artist, color_scheme, args)
     with open(outfilename, "wb") as out:
         out.write(logo)
-
-    # array = convert_count_to_array(config.seq_counter)
-
-    # logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
-
-    # logo_options = LogoOptions()
-    # logo_options.title = "without PIC"
-    # logo_options.stack_width = 50  # increase width of each position
-    # logo_options.stack_height = 100  # increase overall height
-
-    # logo_format = LogoFormat(logo_data, logo_options)
-
-    # Save as PNG
-    # with open("Regular_logo.pdf", "wb") as g:
-    #     g.write(pdf_formatter(logo_data, logo_format))
 
 
 if __name__ == "__main__":
