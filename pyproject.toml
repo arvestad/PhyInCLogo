@@ -32,3 +32,5 @@ dev = [
     "build",
     "twine",
 ]
+[project.urls]
+homepage = "https://github.com/arvestad/PhyInCLogo"
