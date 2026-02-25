@@ -30,40 +30,29 @@ To install the current package:
 > pip3 install .
 ```
 
-## Examples
+## Usage
 
-Run this command:
+The basic usage is as follows.
+```
+> phyinc treefile fastafile
+```
+Since no outfile is given, the logo is output to `fastafile.fa_logo.pdf`. 
+You can decide outputfile and format using the `-o` option:
+```
+> phyinc -o the_logo.png treefile fastafile
+```
+
+
+### Examples
+
+
+There is example data in the github repository, and there you can 
+run this command:
 ``` 
 > phyinc ./examples/synthetic_data/ex1_t1.tree ./examples/synthetic_data/ex1.fa
 ```
 This should create a PDF named "ex1.fa_seqlogo.pdf" in the examples folder.
 
-
-## Files Inside
-
-README.md
-src/
-|-- phyinc/
-    |-- config.py  
-    |-- phyinc.py  /
-    |-- io.py
-	|-- version.py
-examples/
-|-- ex1_t1.tree
-|-- ex1.fa
-
-
-config.py is a configuration file used to save the confirguration from phyinc
-
-ex1_t1.tree is a .tree file provided as an example
-
-ex1.fa is a .fa file provided as an example
-
-phyinc.py is the program
-
-Regular_logo.pdf is the output if you run the program on the example files provided
-
-With_PIC_logo.png is the output if you run the program on the example files provided
 
 # License 
 
