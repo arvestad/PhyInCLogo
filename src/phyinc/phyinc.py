@@ -13,23 +13,25 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 from Bio import Phylo
-from Bio import SeqIO
 
-import phyinc.config
-import phyinc.io
-
+import phyinc.config as config
+import phyinc.io as io
+from phyinc.colorhelper import decide_color_scheme
+from importlib.metadata import version
 
 from weblogo import LogoData, LogoOptions, LogoFormat, formatters as logo_formatters
 
 
 output_formats = ["pdf", "eps", "png", "jpeg", "gif"]
 fineprint = "Created with PhyInC Logo + WebLogo"
-
+description_str = """
+Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account.
+"""
 
 def setup_argparse():
     # Apply PIC on tree file and corresbond Name-sequnce file, outputs 2 .png file(sequnce logo with and with out applying PIC).
     parser = argparse.ArgumentParser(
-        description="Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account."
+        description=description_str + f" Version {version('phyinc')}."
     )
     parser.add_argument(
         "tree_filename", type=str, help="Path to the .tree file (newick format)"
@@ -40,24 +42,28 @@ def setup_argparse():
         help="Path to the Fasta file. Assumes sequence name in the format of: ETA_STAAU/96-110",
     )
     parser.add_argument(
-        '-t', '--type',
-        choices=['aa', 'dna', 'rna', 'guess'], default='guess',
+        "-c",
+        "--color-scheme",
+        choices=["monochrome", "nucleotide", "base pairing", "hydrophobicity", "chemistry", "charge", "taylor", "guess"],
+        default="guess",
+        help="Choose color scheme. If using 'guess', then sequence type chooses between 'nucleotide' and 'taylor'."
+    )
+    parser.add_argument(
+        "-t",
+        "--type",
+        choices=["aa", "dna", "rna", "guess"],
+        default="guess",
         help="Specify what sequence type to assume. Default: %(default)s")
     parser.add_argument(
-        "-o", "--outfile", type=str,
+        "-o",
+        "--outfile",
+        type=str,
         help="Name of outfile. If this option is not used, it will be inferred from the sequence file. If the filename ends with .pdf, .png, or corresponding to another accepted format, that output format will be chosen.")
-    parser.add_argument(
-        "-f", "--format", choices = output_formats,
-        help=f"Choose an output format, one of {output_formats}. This option is ignored if --outfile is used and a format is given in the filename."
-        )
-    parser.add_argument(
-        "-n", "--no-fineprint", action='store_true',
-        help=f'Do not add a string indicating what software produced the logo ("{fineprint}")'
-    )
     parser.add_argument(
         "-f",
         "--format",
         choices=output_formats,
+        default="pdf",
         help=f"Choose an output format, one of {output_formats}. This option is ignored if --outfile is used and a format is given in the filename.",
     )
     parser.add_argument(
@@ -65,6 +71,17 @@ def setup_argparse():
         "--no-fineprint",
         action="store_true",
         help=f'Do not add a string indicating what software produced the logo ("{fineprint}")',
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help=f"Write more information to stderr",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"phyinc version {version('phyinc')}"
     )
 
     return parser
@@ -95,6 +112,7 @@ def output_info(args):
             )  # If argparse accepted the string, then it is good
 
         outfile = args.seq_filename + "_logo." + graphics_format
+
     return outfile, logo_formatters[graphics_format]
 
 
@@ -157,6 +175,8 @@ def add_length(leaf_i, leaf_j):
 
 def enforce_bifurcations(children):
     """
+    TODO: misleading name! I completely misunderstood Haolin's code.
+
     In case the tree has multifurcating nodes, we create bifurcations
     by adding very short edges.
     """
@@ -199,27 +219,23 @@ def enforce_bifurcations(children):
     return branch_length_temp[0], seq_matrix_temp[0]
 
 
-def pic_seqlogo(tree, logo_formatter, no_fine_print):
-
+def pic_seqlogo(tree, logo_formatter, color_scheme, args):
     for child in tree.clade:
         traverse_postorder(child)
 
     result, seq_matrix = enforce_bifurcations(tree.clade)
-
     array = convert_matrix_to_array(seq_matrix)
 
     logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
-
     logo_options = LogoOptions()
-    # logo_options.title = "With PIC logo"
 
-    if no_fine_print:
+    if args.no_fineprint:
         logo_options.show_fineprint = False
-
     else:
         # add the fine print
         logo_options.fineprint = fineprint
 
+    logo_options.color_scheme = color_scheme
     logo_options.stack_width = 50  # increase width of each position
     logo_options.stack_height = 100  # increase overall height
 
@@ -285,6 +301,12 @@ def main():
     ap = setup_argparse()
     args = ap.parse_args()
 
+    if args.verbose:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="phyinc: %(message)s",
+        )
+
     tree_file = validate_path(args.tree_filename)
     seq_file = validate_path(args.seq_filename)
 
@@ -293,24 +315,21 @@ def main():
     tree = Phylo.read(tree_file, "newick")
 
     # config.py to store global variables
-    config.alignment, config.seq_type = io.read_sequences(seq_file, "fasta", args)
-    logging.info("Alignment width = " + str(config.seq_length))
-    logging.info("Sequence type = " + str(config.seq_type))
+    config.alignment, config.seq_type, color_scheme = io.read_sequences(seq_file, "fasta", args)
+    logging.info(f"Alignment width:  {config.seq_length}")
+    logging.info(f"Sequence type:    {config.seq_type}")
+    logging.info(f"Number of leaves: {tree.count_terminals()}")
+
+    color_scheme = decide_color_scheme(args, color_scheme)
 
     config.seq_dict = {}  # dictionary for storing sequnce matrix
     config.seq_counter = (
         {}
-    )  # dictionary storing count matrix as a whole(generate unmodifed sequnce logo)
+    )  # dictionary storing count matrix as a whole(generate unmodifed sequence logo)
     config.matrix = np.zeros(
         (len(config.seq_type), config.seq_length), dtype=float
     )  # a default matrix for each individual leaf/node, to store character counts.
     config.existing_characters = []
-
-    # initialize the seq_counter dictionary
-    # length_of_config = len(config.seq_type.letters())
-    # print(length_of_config)
-    # print(type(config.seq_type), config.seq_type)
-    # print(config.seq_type.letters()[1])
 
     for i in range(0, len(config.seq_type.letters())):
         # Alphabet object is not subscriptable so you cannot call config.seq_type[i]
@@ -318,24 +337,9 @@ def main():
             (config.seq_length,), dtype=int
         ).tolist()
 
-    logo = pic_seqlogo(tree, logo_artist, args.no_fineprint)
+    logo = pic_seqlogo(tree, logo_artist, color_scheme, args)
     with open(outfilename, "wb") as out:
         out.write(logo)
-
-    # array = convert_count_to_array(config.seq_counter)
-
-    # logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
-
-    # logo_options = LogoOptions()
-    # logo_options.title = "without PIC"
-    # logo_options.stack_width = 50  # increase width of each position
-    # logo_options.stack_height = 100  # increase overall height
-
-    # logo_format = LogoFormat(logo_data, logo_options)
-
-    # Save as PNG
-    # with open("Regular_logo.pdf", "wb") as g:
-    #     g.write(pdf_formatter(logo_data, logo_format))
 
 
 if __name__ == "__main__":
