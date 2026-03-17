@@ -1,5 +1,7 @@
 from Bio import SeqIO
 import logging
+import re
+
 import phyinc.config as config
 
 from weblogo.colorscheme import hydrophobicity, nucleotide # Default color schemes
@@ -32,6 +34,9 @@ protein_alphabets = [
         protein_alphabet,
 ]
 
+domain_coord_pattern = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*)/(\d+)-(\d+)$')
+
+
 def match_alphabets(char_set, available_alphabets):
     for alphabet in available_alphabets:
         if char_set.issubset(set(alphabet)):
@@ -57,10 +62,10 @@ def infer_sequence_type(char_set, args):
     if args.type == 'guess':           # User leaves it to us to choose
         choice = match_alphabets(char_set, unambiguous_dna_alphabet)
         if choice is not None:
-            return choice, 'nucleotide'
+            return choice, nucleotide
         choice = match_alphabets(char_set, unambiguous_rna_alphabet)
         if choice is not None:
-            return choice, 'nucleotide'
+            return choice, nucleotide
         return match_alphabets(char_set, protein_alphabets), hydrophobicity
 
     elif args.type == 'dna':
@@ -68,7 +73,7 @@ def infer_sequence_type(char_set, args):
     elif args.type == 'rna':
         return match_alphabets(char_set, rna_alphabets), nucleotide
     elif args.type == 'aa':
-        return match_alphabets(char_set, aa_alphabets), hydrophobicity
+        return match_alphabets(char_set, protein_alphabets), hydrophobicity
     else:
         raise Exception("Bug in infer_sequence_type. Please report!")
     
@@ -99,11 +104,63 @@ def read_sequences(filename, filetype, args):
 
         seq_str = seq_str.upper()
         characters.update(set(seq_str))
-        seq_dict[acc] = seq_str
+        if args.coords:
+            m = domain_coord_pattern.match(acc) # Is acc on the form "HUBBA/17-35"?
+            if m:
+                prot_acc, domain_start, domain_end = m.groups()
+                if prot_acc in seq_dict:
+                    raise IOError(f"'{prot_acc}' is a protein appearing twice, probably because you have two domains from the same protein in the input. If so, you must submit a tree inferred on the domain sequences, not on the proteins.")
+                seq_dict[prot_acc] = seq_str # Map protein accession to seq
+
+        # Always insert for full accession, even if domain start and end are included
+        seq_dict[acc] = seq_str      # Map domain accession to seq
 
     seq_type, coloring_scheme = infer_sequence_type(characters, args)
     config.seq_type = seq_type     # TODO: remove!
     config.characters = characters # TODO: remove!
     return seq_dict, seq_type, coloring_scheme
 
+
+def check_accession_consistency(seq_dict, tree, ignore_domain_coords=False):
+    """
+    Verify that sequence accessions and tree leaf names agree.
+
+    Raises ValueError if any sequence accession has no corresponding
+    leaf in the tree.
+    """
+    tree_leaves = {clade.name for clade in tree.get_terminals()}
+    seq_accessions = set(seq_dict.keys())
+    if ignore_domain_coords:
+        for acc in seq_dict.keys():
+            m = domain_coord_pattern.match(acc)
+            if m:
+                seq_accessions.remove(acc)
+
+    missing_from_seq = tree_leaves - seq_accessions
+    missing_from_tree = seq_accessions - tree_leaves
+
+    messages = []
+    if missing_from_seq:
+        n = len(missing_from_seq)
+        if n > 4:
+            name_lst = sorted(list(missing_from_seq))
+            names = ", ".join(name_lst[:4])
+            messages.append(f"{n} tree leaves not found in sequence file: {names} and {n-3} more.")
+        else:
+            names = ", ".join(sorted(missing_from_seq))
+            messages.append(f"Tree leaves not found in sequence file: {names}")
+
+    if missing_from_tree:
+        n = len(missing_from_tree)
+        if n > 4:
+            name_lst = sorted(list(missing_from_tree))
+            names = ", ".join(name_lst[:4])
+            messages.append(f"{n} sequence accessions not found in tree: {names} and {n-3} more.")
+        else:
+            name_lst = sorted(list(missing_from_tree))
+            names = ", ".join(name_lst[:4])
+            messages.append(f"Sequence accessions not found in tree: {names}")
+
+    if messages:
+        raise ValueError("\n".join(messages))
 

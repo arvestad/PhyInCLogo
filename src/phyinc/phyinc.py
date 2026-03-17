@@ -34,19 +34,24 @@ def setup_argparse():
         description=description_str + f" Version {version('phyinc')}."
     )
     parser.add_argument(
-        "tree_filename", type=str, help="Path to the .tree file (newick format)"
-    )
-    parser.add_argument(
         "seq_filename",
         type=str,
         help="Path to the Fasta file. Assumes sequence name in the format of: ETA_STAAU/96-110",
     )
     parser.add_argument(
+        "tree_filename", type=str, help="Path to the .tree file (newick format)"
+    )
+    parser.add_argument(
         "-c",
         "--color-scheme",
-        choices=["monochrome", "nucleotide", "base pairing", "hydrophobicity", "chemistry", "charge", "taylor", "guess"],
+        choices=["monochrome", "nucleotide", "base_pairing", "hydrophobicity", "chemistry", "charge", "taylor", "guess"],
         default="guess",
         help="Choose color scheme. If using 'guess', then sequence type chooses between 'nucleotide' and 'taylor'."
+    )
+    parser.add_argument(
+        "--coords",
+        action="store_true",
+        help="Ignore domain coordinates in the sequence file when matching accessions to the treefile. I.e., for an accession like 'ACC/17-33' only 'ACC' is used."
     )
     parser.add_argument(
         "-t",
@@ -150,7 +155,8 @@ def convert_count_to_array(matrix):
 
 
 def set_seq(leaf_i, leaf_j):
-    """caculate frequncy matrix (x_i) for parent node"""
+    """Calculate frequency matrix (x_i) for parent node"""
+    # TODO: choose better function name
     l = float(leaf_i.branch_length)
     r = float(leaf_j.branch_length)
     if (l == 0) and (r == 0):
@@ -247,7 +253,7 @@ def traverse_postorder(clade):
     if len(clade) == 0:  # only tips of the tree will have length 0
         clade.seq = str(
             config.alignment[clade.name].seq
-        )  # store str(sequnces) as an artribute for the clade object(of biopython package).
+        )  # store str(sequences) as an attribute for the clade object (of biopython package).
 
         seq_matrix = config.matrix.copy()  # make a copy of the default sequnce matrix
         for i in range(0, len(clade.seq)):
@@ -261,8 +267,7 @@ def traverse_postorder(clade):
             )  # a count matrix for each individual leaf, used later to caculate frequncy matrix for parent nodes
 
         config.seq_dict[clade] = seq_matrix  # stores the matrix to dictionary
-
-    if len(clade) > 0:  # a parent node
+    else:  # a parent node, because len(clade) > 0
         for child in clade:
             traverse_postorder(child)
         if len(clade) == 2:
@@ -270,7 +275,7 @@ def traverse_postorder(clade):
                 clade[0], clade[1]
             )
             config.seq_dict[clade] = set_seq(clade[0], clade[1])
-        if len(clade) > 2:
+        else:
             branch_length, seq_matrix = enforce_bifurcations(clade)
             clade.branch_length = float(clade.branch_length) + branch_length
             config.seq_dict[clade] = seq_matrix
@@ -281,6 +286,7 @@ def traverse_postorder(clade):
 
 def find_clades(clade, condition):
     """Find clades matching a condition, used in testing."""
+    # TODO: remove?
     matches = []
     if condition(clade):
         matches.append(clade)
@@ -292,7 +298,7 @@ def find_clades(clade, condition):
 def validate_path(filename):
     path = Path(filename)
     if not path.is_file():
-        raise FileNotFoundError(f".tree {filename} is not a file.")
+        raise FileNotFoundError(f"Cannot open {filename}.")
     return path
 
 
@@ -307,22 +313,46 @@ def main():
             format="phyinc: %(message)s",
         )
 
-    tree_file = validate_path(args.tree_filename)
-    seq_file = validate_path(args.seq_filename)
+    try:
+        tree_file = validate_path(args.tree_filename)
+        seq_file = validate_path(args.seq_filename)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     outfilename, logo_artist = output_info(args)  # Infer details before computing
 
-    tree = Phylo.read(tree_file, "newick")
+    try:
+        tree = Phylo.read(tree_file, "newick")
+    except IOError as e:
+        print(f"Error: {e}", file=sys.stderr)
 
     # config.py to store global variables
-    config.alignment, config.seq_type, color_scheme = io.read_sequences(seq_file, "fasta", args)
+    try:
+        config.alignment, config.seq_type, color_scheme = io.read_sequences(seq_file, "fasta", args)
+    except IOError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(3)
+    except KeyError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(4)
+        
     logging.info(f"Alignment width:  {config.seq_length}")
     logging.info(f"Sequence type:    {config.seq_type}")
     logging.info(f"Number of leaves: {tree.count_terminals()}")
 
+    try:
+        io.check_accession_consistency(config.alignment, tree, args.coords)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(4)
+
     color_scheme = decide_color_scheme(args, color_scheme)
 
-    config.seq_dict = {}  # dictionary for storing sequnce matrix
+    config.seq_dict = {}  # dictionary for storing sequence matrix
     config.seq_counter = (
         {}
     )  # dictionary storing count matrix as a whole(generate unmodifed sequence logo)
@@ -332,20 +362,20 @@ def main():
     config.existing_characters = []
 
     for i in range(0, len(config.seq_type.letters())):
-        # Alphabet object is not subscriptable so you cannot call config.seq_type[i]
         config.seq_counter[config.seq_type.letters()[i]] = np.zeros(
             (config.seq_length,), dtype=int
         ).tolist()
 
-    logo = pic_seqlogo(tree, logo_artist, color_scheme, args)
-    with open(outfilename, "wb") as out:
-        out.write(logo)
+    try:
+        logo = pic_seqlogo(tree, logo_artist, color_scheme, args)
+        with open(outfilename, "wb") as out:
+            out.write(logo)
+    except KeyError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
+        
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except argparse.ArgumentError as e:
-        print(f"Error: {e}", file=sys.stderr)
-    except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
+    main()
+        
