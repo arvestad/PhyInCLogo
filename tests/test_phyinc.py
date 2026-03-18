@@ -4,7 +4,6 @@ import numpy as np
 from pathlib import Path
 from types import SimpleNamespace
 
-import phyinc.config as config
 from phyinc.phyinc import (
     add_length,
     set_seq,
@@ -60,23 +59,11 @@ def test_add_length_one_zero_branch():
 
 # --- set_seq ---
 
-@pytest.fixture(autouse=True)
-def reset_config():
-    """Reset shared config state before each test."""
-    config.seq_dict = {}
-    config.matrix = None
-    config.seq_type = unambiguous_dna_alphabet
-    config.seq_length = 3
-    yield
-    config.seq_dict = {}
-
-
 def test_set_seq_both_zero_returns_matrix():
     sentinel = np.zeros((4, 3))
-    config.matrix = sentinel
     leaf_i = MockClade(0)
     leaf_j = MockClade(0)
-    result = set_seq(leaf_i, leaf_j)
+    result = set_seq(leaf_i, leaf_j, {}, sentinel)
     assert result is sentinel
 
 
@@ -87,9 +74,8 @@ def test_set_seq_equal_branches():
                       [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
     leaf_i = MockClade(1.0)
     leaf_j = MockClade(1.0)
-    config.seq_dict[leaf_i] = mat_i
-    config.seq_dict[leaf_j] = mat_j
-    result = set_seq(leaf_i, leaf_j)
+    seq_dict = {leaf_i: mat_i, leaf_j: mat_j}
+    result = set_seq(leaf_i, leaf_j, seq_dict, np.zeros((4, 3)))
     # With equal branch lengths l=r=1: (l/(l+r))*mat_j + (r/(l+r))*mat_i = 0.5*(mat_i+mat_j)
     expected = 0.5 * (mat_i + mat_j)
     np.testing.assert_array_almost_equal(result, expected)
@@ -100,9 +86,8 @@ def test_set_seq_asymmetric_branches():
     mat_j = np.zeros((4, 3))
     leaf_i = MockClade(3.0)
     leaf_j = MockClade(1.0)
-    config.seq_dict[leaf_i] = mat_i
-    config.seq_dict[leaf_j] = mat_j
-    result = set_seq(leaf_i, leaf_j)
+    seq_dict = {leaf_i: mat_i, leaf_j: mat_j}
+    result = set_seq(leaf_i, leaf_j, seq_dict, np.zeros((4, 3)))
     # l=3, r=1: (l/(l+r))*mat_j + (r/(l+r))*mat_i = 0.75*zeros + 0.25*ones = 0.25
     np.testing.assert_array_almost_equal(result, 0.25 * np.ones((4, 3)))
 
@@ -114,21 +99,18 @@ def test_enforce_bifurcations_two_children():
     mat_b = np.array([[0.0, 1.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
     child_a = MockClade(1.0)
     child_b = MockClade(1.0)
-    config.seq_dict[child_a] = mat_a
-    config.seq_dict[child_b] = mat_b
-    branch, seq = enforce_bifurcations([child_a, child_b])
+    seq_dict = {child_a: mat_a, child_b: mat_b}
+    branch, seq = enforce_bifurcations([child_a, child_b], seq_dict, np.zeros((4, 2)))
     assert branch == pytest.approx(0.5)
     np.testing.assert_array_almost_equal(seq, 0.5 * (mat_a + mat_b))
 
 
 def test_enforce_bifurcations_both_zero_branches():
     sentinel = np.zeros((4, 2))
-    config.matrix = sentinel
     child_a = MockClade(0.0)
     child_b = MockClade(0.0)
-    config.seq_dict[child_a] = np.ones((4, 2))
-    config.seq_dict[child_b] = np.ones((4, 2))
-    branch, seq = enforce_bifurcations([child_a, child_b])
+    seq_dict = {child_a: np.ones((4, 2)), child_b: np.ones((4, 2))}
+    branch, seq = enforce_bifurcations([child_a, child_b], seq_dict, sentinel)
     assert branch == 0
     assert seq is sentinel
 
@@ -138,10 +120,8 @@ def test_enforce_bifurcations_three_children():
     child_a = MockClade(1.0)
     child_b = MockClade(1.0)
     child_c = MockClade(1.0)
-    config.seq_dict[child_a] = mat.copy()
-    config.seq_dict[child_b] = mat.copy()
-    config.seq_dict[child_c] = mat.copy()
-    branch, seq = enforce_bifurcations([child_a, child_b, child_c])
+    seq_dict = {child_a: mat.copy(), child_b: mat.copy(), child_c: mat.copy()}
+    branch, seq = enforce_bifurcations([child_a, child_b, child_c], seq_dict, np.zeros((4, 3)))
     assert isinstance(branch, float)
     assert seq.shape == mat.shape
 
@@ -149,20 +129,16 @@ def test_enforce_bifurcations_three_children():
 # --- convert_matrix_to_array ---
 
 def test_convert_matrix_to_array_shape():
-    config.seq_type = unambiguous_dna_alphabet  # 'ACGT', 4 chars
-    config.seq_length = 5
     matrix = np.zeros((4, 5))
-    result = convert_matrix_to_array(matrix)
+    result = convert_matrix_to_array(matrix, unambiguous_dna_alphabet, 5)
     assert result.shape == (5, 4)
 
 
 def test_convert_matrix_to_array_values():
-    config.seq_type = unambiguous_dna_alphabet
-    config.seq_length = 2
     matrix = np.zeros((4, 2))
     matrix[0][0] = 1.0   # A at position 0
     matrix[2][1] = 0.5   # G at position 1
-    result = convert_matrix_to_array(matrix)
+    result = convert_matrix_to_array(matrix, unambiguous_dna_alphabet, 2)
     assert result[0][0] == pytest.approx(1.0)   # position 0, char A (index 0)
     assert result[1][2] == pytest.approx(0.5)   # position 1, char G (index 2)
 
@@ -170,24 +146,20 @@ def test_convert_matrix_to_array_values():
 # --- convert_count_to_array ---
 
 def test_convert_count_to_array_shape():
-    config.seq_type = unambiguous_dna_alphabet
-    config.seq_length = 3
     count_matrix = {
         'A': [1, 0, 2],
         'C': [0, 3, 0],
         'G': [0, 0, 1],
         'T': [2, 1, 0],
     }
-    result = convert_count_to_array(count_matrix)
+    result = convert_count_to_array(count_matrix, unambiguous_dna_alphabet, 3)
     assert result.shape == (3, 4)
 
 
 def test_convert_count_to_array_missing_key():
-    config.seq_type = unambiguous_dna_alphabet
-    config.seq_length = 2
     # Only 'A' present; other characters default to 0
     count_matrix = {'A': [5, 3]}
-    result = convert_count_to_array(count_matrix)
+    result = convert_count_to_array(count_matrix, unambiguous_dna_alphabet, 2)
     assert result[0][0] == pytest.approx(5)   # A at pos 0
     assert result[0][1] == pytest.approx(0)   # C at pos 0 (missing -> 0)
 

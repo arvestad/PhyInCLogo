@@ -129,42 +129,40 @@ def export_scores_to_file(scores_str, file_name):
         print("Already exists.")
 
 
-def convert_matrix_to_array(matrix):
+def convert_matrix_to_array(matrix, seq_type, seq_length):
     array = []
-    for i in range(0, config.seq_length):
+    for i in range(0, seq_length):
         sub_array = []
-        for c in config.seq_type:
-            sub_array.append(matrix[config.seq_type.letters().index(c)][i])
+        for c in seq_type:
+            sub_array.append(matrix[seq_type.letters().index(c)][i])
         array.append(sub_array)
-    # export_scores_to_file(str(all_scores),'ex1_t3.txt')
     return np.array(array)
 
 
-def convert_count_to_array(matrix):
+def convert_count_to_array(matrix, seq_type, seq_length):
     array = []
-    for i in range(0, config.seq_length):
+    for i in range(0, seq_length):
         sub_array = []
-        for c in config.seq_type:
+        for c in seq_type:
             if str(c) not in matrix:
                 sub_array.append(0)
             else:
                 sub_array.append(matrix[c][i])
         array.append(sub_array)
-    # export_scores_to_file(str(all_scores_count),'ex1_without.txt')
     return np.array(array)
 
 
-def set_seq(leaf_i, leaf_j):
+def set_seq(leaf_i, leaf_j, seq_dict, zero_matrix):
     """Calculate frequency matrix (x_i) for parent node"""
     # TODO: choose better function name
     l = float(leaf_i.branch_length)
     r = float(leaf_j.branch_length)
     if (l == 0) and (r == 0):
-        return config.matrix
+        return zero_matrix
     else:
         seq_matrix = np.add(
-            (l / (l + r)) * config.seq_dict[leaf_j],
-            (r / (l + r)) * config.seq_dict[leaf_i],
+            (l / (l + r)) * seq_dict[leaf_j],
+            (r / (l + r)) * seq_dict[leaf_i],
         )
         return seq_matrix
 
@@ -179,7 +177,7 @@ def add_length(leaf_i, leaf_j):
         return (l * r) / (l + r)
 
 
-def enforce_bifurcations(children):
+def enforce_bifurcations(children, seq_dict, zero_matrix):
     """
     TODO: misleading name! I completely misunderstood Haolin's code.
 
@@ -190,7 +188,7 @@ def enforce_bifurcations(children):
     seq_matrix_temp = []
     for child in children:
         branch_length_temp.append(float(child.branch_length))
-        seq_matrix_temp.append(config.seq_dict[child])
+        seq_matrix_temp.append(seq_dict[child])
 
     while len(branch_length_temp) > 1 and len(seq_matrix_temp) > 1:
         leaf_i_branch_length = branch_length_temp.pop(0)
@@ -200,7 +198,7 @@ def enforce_bifurcations(children):
 
         if (leaf_i_branch_length == 0) and (leaf_j_branch_length == 0):
             branch_length_temp.append(0)
-            seq_matrix_temp.append(config.matrix)
+            seq_matrix_temp.append(zero_matrix)
         else:
             branch_length_temp.append(
                 (
@@ -225,14 +223,22 @@ def enforce_bifurcations(children):
     return branch_length_temp[0], seq_matrix_temp[0]
 
 
-def pic_seqlogo(tree, logo_formatter, color_scheme, args):
+def pic_seqlogo(tree, logo_formatter, color_scheme, args, alignment, seq_type, seq_length):
+    # Build local state for this run — no global config needed.
+    zero_matrix = np.zeros((len(seq_type), seq_length), dtype=float)
+    seq_dict = {}
+    seq_counter = {
+        seq_type.letters()[i]: np.zeros((seq_length,), dtype=int).tolist()
+        for i in range(len(seq_type.letters()))
+    }
+
     for child in tree.clade:
-        traverse_postorder(child)
+        traverse_postorder(child, alignment, seq_type, zero_matrix, seq_dict, seq_counter)
 
-    result, seq_matrix = enforce_bifurcations(tree.clade)
-    array = convert_matrix_to_array(seq_matrix)
+    result, seq_matrix = enforce_bifurcations(tree.clade, seq_dict, zero_matrix)
+    array = convert_matrix_to_array(seq_matrix, seq_type, seq_length)
 
-    logo_data = LogoData.from_counts(alphabet=config.seq_type, counts=array)
+    logo_data = LogoData.from_counts(alphabet=seq_type, counts=array)
     logo_options = LogoOptions()
 
     if args.no_fineprint:
@@ -249,36 +255,36 @@ def pic_seqlogo(tree, logo_formatter, color_scheme, args):
     return logo_formatter(logo_data, logo_format)
 
 
-def traverse_postorder(clade):
+def traverse_postorder(clade, alignment, seq_type, zero_matrix, seq_dict, seq_counter):
     if len(clade) == 0:  # only tips of the tree will have length 0
         clade.seq = str(
-            config.alignment[clade.name].seq
+            alignment[clade.name].seq
         )  # store str(sequences) as an attribute for the clade object (of biopython package).
 
-        seq_matrix = config.matrix.copy()  # make a copy of the default sequnce matrix
+        seq_matrix = zero_matrix.copy()  # make a copy of the default sequence matrix
         for i in range(0, len(clade.seq)):
-            config.seq_counter[clade.seq[i].upper()][
+            seq_counter[clade.seq[i].upper()][
                 i
             ] += 1  # count and store for each character as a whole
 
-            character_index = config.seq_type.letters().index(clade.seq[i].upper())
+            character_index = seq_type.letters().index(clade.seq[i].upper())
             seq_matrix[character_index, i] = float(
                 1
-            )  # a count matrix for each individual leaf, used later to caculate frequncy matrix for parent nodes
+            )  # a count matrix for each individual leaf, used later to calculate frequency matrix for parent nodes
 
-        config.seq_dict[clade] = seq_matrix  # stores the matrix to dictionary
+        seq_dict[clade] = seq_matrix  # stores the matrix to dictionary
     else:  # a parent node, because len(clade) > 0
         for child in clade:
-            traverse_postorder(child)
+            traverse_postorder(child, alignment, seq_type, zero_matrix, seq_dict, seq_counter)
         if len(clade) == 2:
             clade.branch_length = float(clade.branch_length) + add_length(
                 clade[0], clade[1]
             )
-            config.seq_dict[clade] = set_seq(clade[0], clade[1])
+            seq_dict[clade] = set_seq(clade[0], clade[1], seq_dict, zero_matrix)
         else:
-            branch_length, seq_matrix = enforce_bifurcations(clade)
+            branch_length, seq_matrix = enforce_bifurcations(clade, seq_dict, zero_matrix)
             clade.branch_length = float(clade.branch_length) + branch_length
-            config.seq_dict[clade] = seq_matrix
+            seq_dict[clade] = seq_matrix
 
 
         
@@ -352,22 +358,9 @@ def main():
 
     color_scheme = decide_color_scheme(args, color_scheme)
 
-    config.seq_dict = {}  # dictionary for storing sequence matrix
-    config.seq_counter = (
-        {}
-    )  # dictionary storing count matrix as a whole(generate unmodifed sequence logo)
-    config.matrix = np.zeros(
-        (len(config.seq_type), config.seq_length), dtype=float
-    )  # a default matrix for each individual leaf/node, to store character counts.
-    config.existing_characters = []
-
-    for i in range(0, len(config.seq_type.letters())):
-        config.seq_counter[config.seq_type.letters()[i]] = np.zeros(
-            (config.seq_length,), dtype=int
-        ).tolist()
-
     try:
-        logo = pic_seqlogo(tree, logo_artist, color_scheme, args)
+        logo = pic_seqlogo(tree, logo_artist, color_scheme, args,
+                           config.alignment, config.seq_type, config.seq_length)
         with open(outfilename, "wb") as out:
             out.write(logo)
     except KeyError as e:
