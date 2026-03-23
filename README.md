@@ -49,9 +49,25 @@ You can decide outputfile and format using the `-o` option:
 There is example data in the github repository, and there you can 
 run this command:
 ``` 
-> phyinc ./examples/synthetic_data/ex1_t1.tree ./examples/synthetic_data/ex1.fa
+> phyinc examples/synthetic_data/ex1_t1.tree examples/synthetic_data/ex1.fa
 ```
 This should create a PDF named "ex1.fa_seqlogo.pdf" in the examples folder.
+
+There are cases when a phylogeny is created on proteins but the logo is
+created for domains and this may cause protein accessions be something like 
+`ETA_STAAU` but the domain accession is `ETA_STAAU/96-110`. You can then use 
+the `--coords` option to ignore the domain coordinates when mapping the domain 
+to a tree. 
+```
+> phyinc --coords examples/PF000672.fa examples/PF000672.treefile
+```
+However, `phyinc` will report an error if there more than one domain per protein:
+```
+> phyinc --coords PS00027.fa PS00027.treefile
+Error: 'ZFH2_DROME' is a protein appearing twice, probably because you have two 
+domains from the same protein in the input. If so, you must submit a tree inferred
+on the domain sequences, not on the proteins.
+```
 
 
 # License 
