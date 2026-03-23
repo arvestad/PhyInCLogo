@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "phyinc"
 description = "Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account"
-version="1.0"
+version="1.1"
 readme = "README.md"
 authors = [{name = "Haolin Guo"}, {name = "Lars Arvestad", email="arve@math.su.se"}]
 maintainers = [{name = "Lars Arvestad", email = "arve@math.su.se"}]
