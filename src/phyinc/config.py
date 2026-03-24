@@ -1,10 +1,2 @@
-alignment = None
-seq_dict = None 
-seq_counter = None 
-
-matrix = None
-characters = set()
-existing_characters = None
-
-seq_type = 'dna'
-seq_length = 0
+# This module has been emptied. Global state has been removed in favour of
+# explicit function parameters and local variables.

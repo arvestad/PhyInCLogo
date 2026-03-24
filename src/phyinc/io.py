@@ -2,8 +2,6 @@ from Bio import SeqIO
 import logging
 import re
 
-import phyinc.config as config
-
 from weblogo.colorscheme import hydrophobicity, nucleotide # Default color schemes
 
 from weblogo.seq import (
@@ -34,6 +32,8 @@ protein_alphabets = [
         protein_alphabet,
 ]
 
+all_alphabets = dna_alphabets + rna_alphabets + protein_alphabets
+
 domain_coord_pattern = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*)/(\d+)-(\d+)$')
 
 
@@ -60,7 +60,7 @@ def infer_sequence_type(char_set, args):
     Returns: an weblogo.Alphabet object and a coloring scheme.
     """
     if args.type == 'guess':           # User leaves it to us to choose
-        choice = match_alphabets(char_set, unambiguous_dna_alphabet)
+        choice = match_alphabets(char_set, all_alphabets)
         if choice is not None:
             return choice, nucleotide
         choice = match_alphabets(char_set, unambiguous_rna_alphabet)
@@ -83,24 +83,22 @@ def read_sequences(filename, filetype, args):
     Read the input alignment and perform basic length checks.
     Also, determine what kind of bio sequence we read.
 
-    Returns a dict with the alignment, a matching alphabet, and
-    a suggested coloring scheme.
+    Returns seq_dict, seq_type, seq_length, and a suggested coloring scheme.
     """
 
     record_dict = SeqIO.to_dict(SeqIO.parse(filename, filetype))
     seq_dict = {}
     characters = set()
 
-    alignment_width = None
+    seq_length = None
     for acc, seq_str in record_dict.items():
-        if len(seq_str) != alignment_width:
-            if alignment_width:
+        if len(seq_str) != seq_length:
+            if seq_length:
                 raise Exception(
                     "Sequence lengths from provided fastafile are inconsistent"
                 )
             else:
-                alignment_width = len(seq_str)
-                config.seq_length = len(seq_str)
+                seq_length = len(seq_str)
 
         seq_str = seq_str.upper()
         characters.update(set(seq_str))
@@ -116,9 +114,7 @@ def read_sequences(filename, filetype, args):
         seq_dict[acc] = seq_str      # Map domain accession to seq
 
     seq_type, coloring_scheme = infer_sequence_type(characters, args)
-    config.seq_type = seq_type     # TODO: remove!
-    config.characters = characters # TODO: remove!
-    return seq_dict, seq_type, coloring_scheme
+    return seq_dict, seq_type, seq_length, coloring_scheme
 
 
 def check_accession_consistency(seq_dict, tree, ignore_domain_coords=False):

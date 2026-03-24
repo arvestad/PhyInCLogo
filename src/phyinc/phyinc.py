@@ -1,20 +1,16 @@
 import argparse
 import logging
-import math
-import os
 import sys
-import weblogo  # is this needed?
 
 import numpy as np
-import matplotlib
 
+import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 from pathlib import Path
 from Bio import Phylo
 
-import phyinc.config as config
 import phyinc.io as io
 from phyinc.colorhelper import decide_color_scheme
 from importlib.metadata import version
@@ -168,7 +164,7 @@ def set_seq(leaf_i, leaf_j, seq_dict, zero_matrix):
 
 
 def add_length(leaf_i, leaf_j):
-    """caculate new branch length (v_i') for parent node"""
+    """calculate new branch length (v_i') for parent node"""
     l = float(leaf_i.branch_length)
     r = float(leaf_j.branch_length)
     if (l == 0) and (r == 0):
@@ -332,10 +328,10 @@ def main():
         tree = Phylo.read(tree_file, "newick")
     except IOError as e:
         print(f"Error: {e}", file=sys.stderr)
+        sys.exit(5)
 
-    # config.py to store global variables
     try:
-        config.alignment, config.seq_type, color_scheme = io.read_sequences(seq_file, "fasta", args)
+        alignment, seq_type, seq_length, color_scheme = io.read_sequences(seq_file, "fasta", args)
     except IOError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(3)
@@ -345,13 +341,13 @@ def main():
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(4)
-        
-    logging.info(f"Alignment width:  {config.seq_length}")
-    logging.info(f"Sequence type:    {config.seq_type}")
+
+    logging.info(f"Alignment width:  {seq_length}")
+    logging.info(f"Sequence type:    {seq_type}")
     logging.info(f"Number of leaves: {tree.count_terminals()}")
 
     try:
-        io.check_accession_consistency(config.alignment, tree, args.coords)
+        io.check_accession_consistency(alignment, tree, args.coords)
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(4)
@@ -360,7 +356,7 @@ def main():
 
     try:
         logo = pic_seqlogo(tree, logo_artist, color_scheme, args,
-                           config.alignment, config.seq_type, config.seq_length)
+                           alignment, seq_type, seq_length)
         with open(outfilename, "wb") as out:
             out.write(logo)
     except KeyError as e:
