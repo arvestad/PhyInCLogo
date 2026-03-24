@@ -7,13 +7,11 @@ from types import SimpleNamespace
 from phyinc.phyinc import (
     add_length,
     set_seq,
-    enforce_bifurcations,
+    collapse_bifurcations,
     output_info,
     validate_path,
-    find_clades,
     export_scores_to_file,
     convert_matrix_to_array,
-    convert_count_to_array,
 )
 from weblogo.seq import unambiguous_dna_alphabet
 
@@ -92,36 +90,36 @@ def test_set_seq_asymmetric_branches():
     np.testing.assert_array_almost_equal(result, 0.25 * np.ones((4, 3)))
 
 
-# --- enforce_bifurcations ---
+# --- collapse_bifurcations ---
 
-def test_enforce_bifurcations_two_children():
+def test_collapse_bifurcations_two_children():
     mat_a = np.array([[1.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
     mat_b = np.array([[0.0, 1.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])
     child_a = MockClade(1.0)
     child_b = MockClade(1.0)
     seq_dict = {child_a: mat_a, child_b: mat_b}
-    branch, seq = enforce_bifurcations([child_a, child_b], seq_dict, np.zeros((4, 2)))
+    branch, seq = collapse_bifurcations([child_a, child_b], seq_dict, np.zeros((4, 2)))
     assert branch == pytest.approx(0.5)
     np.testing.assert_array_almost_equal(seq, 0.5 * (mat_a + mat_b))
 
 
-def test_enforce_bifurcations_both_zero_branches():
+def test_collapse_bifurcations_both_zero_branches():
     sentinel = np.zeros((4, 2))
     child_a = MockClade(0.0)
     child_b = MockClade(0.0)
     seq_dict = {child_a: np.ones((4, 2)), child_b: np.ones((4, 2))}
-    branch, seq = enforce_bifurcations([child_a, child_b], seq_dict, sentinel)
+    branch, seq = collapse_bifurcations([child_a, child_b], seq_dict, sentinel)
     assert branch == 0
     assert seq is sentinel
 
 
-def test_enforce_bifurcations_three_children():
+def test_collapse_bifurcations_three_children():
     mat = np.eye(4, 3)
     child_a = MockClade(1.0)
     child_b = MockClade(1.0)
     child_c = MockClade(1.0)
     seq_dict = {child_a: mat.copy(), child_b: mat.copy(), child_c: mat.copy()}
-    branch, seq = enforce_bifurcations([child_a, child_b, child_c], seq_dict, np.zeros((4, 3)))
+    branch, seq = collapse_bifurcations([child_a, child_b, child_c], seq_dict, np.zeros((4, 3)))
     assert isinstance(branch, float)
     assert seq.shape == mat.shape
 
@@ -142,26 +140,6 @@ def test_convert_matrix_to_array_values():
     assert result[0][0] == pytest.approx(1.0)   # position 0, char A (index 0)
     assert result[1][2] == pytest.approx(0.5)   # position 1, char G (index 2)
 
-
-# --- convert_count_to_array ---
-
-def test_convert_count_to_array_shape():
-    count_matrix = {
-        'A': [1, 0, 2],
-        'C': [0, 3, 0],
-        'G': [0, 0, 1],
-        'T': [2, 1, 0],
-    }
-    result = convert_count_to_array(count_matrix, unambiguous_dna_alphabet, 3)
-    assert result.shape == (3, 4)
-
-
-def test_convert_count_to_array_missing_key():
-    # Only 'A' present; other characters default to 0
-    count_matrix = {'A': [5, 3]}
-    result = convert_count_to_array(count_matrix, unambiguous_dna_alphabet, 2)
-    assert result[0][0] == pytest.approx(5)   # A at pos 0
-    assert result[0][1] == pytest.approx(0)   # C at pos 0 (missing -> 0)
 
 
 # --- output_info ---
@@ -233,44 +211,3 @@ def test_export_scores_to_file_existing_file(tmp_path, capsys):
     assert f.read_text() == 'old'  # file unchanged
 
 
-# --- find_clades ---
-
-def test_find_clades_no_match():
-    root = MockClade(0, name='root', clades=[
-        MockClade(1.0, name='A'),
-        MockClade(1.0, name='B'),
-    ])
-    result = find_clades(root, lambda c: c.name == 'Z')
-    assert result == []
-
-
-def test_find_clades_matches_root():
-    root = MockClade(0, name='root')
-    result = find_clades(root, lambda c: c.name == 'root')
-    assert len(result) == 1
-    assert result[0] is root
-
-
-def test_find_clades_matches_leaf():
-    leaf = MockClade(1.0, name='leaf')
-    root = MockClade(0, name='root', clades=[leaf])
-    result = find_clades(root, lambda c: c.name == 'leaf')
-    assert len(result) == 1
-    assert result[0] is leaf
-
-
-def test_find_clades_multiple_matches():
-    leaf_a = MockClade(1.0, name='leaf')
-    leaf_b = MockClade(2.0, name='leaf')
-    root = MockClade(0, name='root', clades=[leaf_a, leaf_b])
-    result = find_clades(root, lambda c: c.name == 'leaf')
-    assert len(result) == 2
-
-
-def test_find_clades_nested():
-    grandchild = MockClade(0.5, name='target')
-    child = MockClade(1.0, name='child', clades=[grandchild])
-    root = MockClade(0, name='root', clades=[child])
-    result = find_clades(root, lambda c: c.name == 'target')
-    assert len(result) == 1
-    assert result[0] is grandchild

@@ -6,7 +6,6 @@ import numpy as np
 
 import matplotlib
 matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
 
 from pathlib import Path
 from Bio import Phylo
@@ -135,18 +134,6 @@ def convert_matrix_to_array(matrix, seq_type, seq_length):
     return np.array(array)
 
 
-def convert_count_to_array(matrix, seq_type, seq_length):
-    array = []
-    for i in range(0, seq_length):
-        sub_array = []
-        for c in seq_type:
-            if str(c) not in matrix:
-                sub_array.append(0)
-            else:
-                sub_array.append(matrix[c][i])
-        array.append(sub_array)
-    return np.array(array)
-
 
 def set_seq(leaf_i, leaf_j, seq_dict, zero_matrix):
     """Calculate frequency matrix (x_i) for parent node"""
@@ -173,7 +160,7 @@ def add_length(leaf_i, leaf_j):
         return (l * r) / (l + r)
 
 
-def enforce_bifurcations(children, seq_dict, zero_matrix):
+def collapse_bifurcations(children, seq_dict, zero_matrix):
     """
     TODO: misleading name! I completely misunderstood Haolin's code.
 
@@ -223,15 +210,11 @@ def pic_seqlogo(tree, logo_formatter, color_scheme, args, alignment, seq_type, s
     # Build local state for this run — no global config needed.
     zero_matrix = np.zeros((len(seq_type), seq_length), dtype=float)
     seq_dict = {}
-    seq_counter = {
-        seq_type.letters()[i]: np.zeros((seq_length,), dtype=int).tolist()
-        for i in range(len(seq_type.letters()))
-    }
 
     for child in tree.clade:
-        traverse_postorder(child, alignment, seq_type, zero_matrix, seq_dict, seq_counter)
+        traverse_postorder(child, alignment, seq_type, zero_matrix, seq_dict)
 
-    result, seq_matrix = enforce_bifurcations(tree.clade, seq_dict, zero_matrix)
+    result, seq_matrix = collapse_bifurcations(tree.clade, seq_dict, zero_matrix)
     array = convert_matrix_to_array(seq_matrix, seq_type, seq_length)
 
     logo_data = LogoData.from_counts(alphabet=seq_type, counts=array)
@@ -251,7 +234,7 @@ def pic_seqlogo(tree, logo_formatter, color_scheme, args, alignment, seq_type, s
     return logo_formatter(logo_data, logo_format)
 
 
-def traverse_postorder(clade, alignment, seq_type, zero_matrix, seq_dict, seq_counter):
+def traverse_postorder(clade, alignment, seq_type, zero_matrix, seq_dict):
     if len(clade) == 0:  # only tips of the tree will have length 0
         clade.seq = str(
             alignment[clade.name].seq
@@ -259,10 +242,6 @@ def traverse_postorder(clade, alignment, seq_type, zero_matrix, seq_dict, seq_co
 
         seq_matrix = zero_matrix.copy()  # make a copy of the default sequence matrix
         for i in range(0, len(clade.seq)):
-            seq_counter[clade.seq[i].upper()][
-                i
-            ] += 1  # count and store for each character as a whole
-
             character_index = seq_type.letters().index(clade.seq[i].upper())
             seq_matrix[character_index, i] = float(
                 1
@@ -271,30 +250,16 @@ def traverse_postorder(clade, alignment, seq_type, zero_matrix, seq_dict, seq_co
         seq_dict[clade] = seq_matrix  # stores the matrix to dictionary
     else:  # a parent node, because len(clade) > 0
         for child in clade:
-            traverse_postorder(child, alignment, seq_type, zero_matrix, seq_dict, seq_counter)
+            traverse_postorder(child, alignment, seq_type, zero_matrix, seq_dict)
         if len(clade) == 2:
             clade.branch_length = float(clade.branch_length) + add_length(
                 clade[0], clade[1]
             )
             seq_dict[clade] = set_seq(clade[0], clade[1], seq_dict, zero_matrix)
         else:
-            branch_length, seq_matrix = enforce_bifurcations(clade, seq_dict, zero_matrix)
+            branch_length, seq_matrix = collapse_bifurcations(clade, seq_dict, zero_matrix)
             clade.branch_length = float(clade.branch_length) + branch_length
             seq_dict[clade] = seq_matrix
-
-
-        
-
-
-def find_clades(clade, condition):
-    """Find clades matching a condition, used in testing."""
-    # TODO: remove?
-    matches = []
-    if condition(clade):
-        matches.append(clade)
-    for sub_clade in clade.clades:
-        matches.extend(find_clades(sub_clade, condition))
-    return matches
 
 
 def validate_path(filename):
