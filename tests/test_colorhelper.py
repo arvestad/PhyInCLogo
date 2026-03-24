@@ -61,7 +61,6 @@ def test_decide_color_scheme_taylor():
 
 
 def test_decide_color_scheme_unknown_falls_back_to_monochrome():
-    # color_lookup.get(unknown, 'monochrome') returns the string 'monochrome', not the object
     args = SimpleNamespace(color_scheme='nonexistent')
     result = decide_color_scheme(args, nucleotide)
-    assert result == 'monochrome'
+    assert result == monochrome

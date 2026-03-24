@@ -22,6 +22,6 @@ def decide_color_scheme(args, color_scheme):
     if args.color_scheme == 'guess':
         return color_scheme
     else:
-        c = color_lookup.get(args.color_scheme, 'monochrome')
+        c = color_lookup.get(args.color_scheme, monochrome)
         return c
 
