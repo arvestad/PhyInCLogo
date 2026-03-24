@@ -67,6 +67,12 @@ def setup_argparse():
         help=f"Choose an output format, one of {output_formats}. This option is ignored if --outfile is used and a format is given in the filename.",
     )
     parser.add_argument(
+        "--export",
+        metavar="filename",
+        type=str,
+        help="Export the PIC-weighted frequency matrix as a tab-separated file and exit without producing a logo.",
+    )
+    parser.add_argument(
         "-n",
         "--no-fineprint",
         action="store_true",
@@ -114,14 +120,6 @@ def output_info(args):
         outfile = args.seq_filename + "_logo." + graphics_format
 
     return outfile, logo_formatters[graphics_format]
-
-
-def export_scores_to_file(scores_str, file_name):
-    try:
-        with open(file_name, "x") as f:
-            f.write(scores_str)
-    except FileExistsError:
-        print("Already exists.")
 
 
 def convert_matrix_to_array(matrix, seq_type, seq_length):
@@ -206,16 +204,21 @@ def collapse_bifurcations(children, seq_dict, zero_matrix):
     return branch_length_temp[0], seq_matrix_temp[0]
 
 
-def pic_seqlogo(tree, logo_formatter, color_scheme, args, alignment, seq_type, seq_length):
-    # Build local state for this run — no global config needed.
+def compute_pic_array(tree, alignment, seq_type, seq_length):
+    """
+    Run the PIC traversal and return the frequency array with shape
+    (seq_length, n_chars), ready for use with WebLogo or export.
+    """
     zero_matrix = np.zeros((len(seq_type), seq_length), dtype=float)
     seq_dict = {}
-
     for child in tree.clade:
         traverse_postorder(child, alignment, seq_type, zero_matrix, seq_dict)
+    _, seq_matrix = collapse_bifurcations(tree.clade, seq_dict, zero_matrix)
+    return convert_matrix_to_array(seq_matrix, seq_type, seq_length)
 
-    result, seq_matrix = collapse_bifurcations(tree.clade, seq_dict, zero_matrix)
-    array = convert_matrix_to_array(seq_matrix, seq_type, seq_length)
+
+def pic_seqlogo(tree, logo_formatter, color_scheme, args, alignment, seq_type, seq_length):
+    array = compute_pic_array(tree, alignment, seq_type, seq_length)
 
     logo_data = LogoData.from_counts(alphabet=seq_type, counts=array)
     logo_options = LogoOptions()
@@ -269,6 +272,30 @@ def validate_path(filename):
     return path
 
 
+def export_pic_data(tree, alignment, seq_type, seq_length, filename):
+    """
+    Compute the PIC-weighted frequency matrix and write it as a
+    tab-separated file (one row per alignment position, one column per
+    character).  Raises SystemExit on any error so callers get a clean
+    error message rather than a traceback.
+    """
+    try:
+        array = compute_pic_array(tree, alignment, seq_type, seq_length)
+    except Exception as e:
+        print(f"Error computing PIC data: {e}", file=sys.stderr)
+        sys.exit(4)
+
+    header = '\t'.join(seq_type.letters())
+    try:
+        with open(filename, 'w') as f:
+            f.write(header + '\n')
+            for row in array:
+                f.write('\t'.join(f'{v:.6f}' for v in row) + '\n')
+    except OSError as e:
+        print(f"Error writing to '{filename}': {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main():
     # Set up argument parser
     ap = setup_argparse()
@@ -318,6 +345,10 @@ def main():
         sys.exit(4)
 
     color_scheme = decide_color_scheme(args, color_scheme)
+
+    if args.export:
+        export_pic_data(tree, alignment, seq_type, seq_length, args.export)
+        sys.exit(0)
 
     try:
         logo = pic_seqlogo(tree, logo_artist, color_scheme, args,

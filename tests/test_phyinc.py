@@ -8,6 +8,7 @@ from phyinc.phyinc import (
     add_length,
     set_seq,
     collapse_bifurcations,
+    compute_pic_array,
     output_info,
     validate_path,
     export_scores_to_file,
@@ -192,6 +193,43 @@ def test_validate_path_nonexistent():
 def test_validate_path_directory(tmp_path):
     with pytest.raises(FileNotFoundError):
         validate_path(str(tmp_path))
+
+
+# --- compute_pic_array ---
+
+def test_compute_pic_array_shape():
+    from types import SimpleNamespace
+    from Bio import Phylo, SeqIO
+    import io as _io
+    import phyinc.io as phyinc_io
+
+    fa_file = os.path.join(EXAMPLES_DIR, 'ex1.fa')
+    tree_file = os.path.join(EXAMPLES_DIR, 'ex1_t1.tree')
+    args = SimpleNamespace(type='aa', coords=False)
+    alignment, seq_type, seq_length, _ = phyinc_io.read_sequences(fa_file, 'fasta', args)
+    tree = Phylo.read(tree_file, 'newick')
+
+    array = compute_pic_array(tree, alignment, seq_type, seq_length)
+
+    assert array.shape == (seq_length, len(seq_type))
+
+
+def test_compute_pic_array_values_sum_to_one():
+    from types import SimpleNamespace
+    from Bio import Phylo
+    import phyinc.io as phyinc_io
+
+    fa_file = os.path.join(EXAMPLES_DIR, 'ex1.fa')
+    tree_file = os.path.join(EXAMPLES_DIR, 'ex1_t1.tree')
+    args = SimpleNamespace(type='aa', coords=False)
+    alignment, seq_type, seq_length, _ = phyinc_io.read_sequences(fa_file, 'fasta', args)
+    tree = Phylo.read(tree_file, 'newick')
+
+    array = compute_pic_array(tree, alignment, seq_type, seq_length)
+
+    # Each row is a weighted average of one-hot vectors, so rows should sum to 1.
+    row_sums = array.sum(axis=1)
+    np.testing.assert_allclose(row_sums, np.ones(seq_length), atol=1e-6)
 
 
 # --- export_scores_to_file ---
