@@ -219,7 +219,6 @@ def compute_pic_array(tree, alignment, seq_type, seq_length):
 
 def pic_seqlogo(tree, logo_formatter, color_scheme, args, alignment, seq_type, seq_length):
     array = compute_pic_array(tree, alignment, seq_type, seq_length)
-
     logo_data = LogoData.from_counts(alphabet=seq_type, counts=array)
     logo_options = LogoOptions()
 
@@ -232,6 +231,7 @@ def pic_seqlogo(tree, logo_formatter, color_scheme, args, alignment, seq_type, s
     logo_options.color_scheme = color_scheme
     logo_options.stack_width = 50  # increase width of each position
     logo_options.stack_height = 100  # increase overall height
+    logo_options.units = 'bits'
 
     logo_format = LogoFormat(logo_data, logo_options)
     return logo_formatter(logo_data, logo_format)
