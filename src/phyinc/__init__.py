@@ -1,1 +1,1 @@
-# This is a package indicator
+from phyinc.phyinc import create_logo

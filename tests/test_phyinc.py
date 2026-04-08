@@ -5,16 +5,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from phyinc.phyinc import (
-    add_length,
-    set_seq,
     collapse_bifurcations,
     compute_pic_array,
-    output_info,
-    validate_path,
-    export_scores_to_file,
     convert_matrix_to_array,
 )
-from weblogo.seq import unambiguous_dna_alphabet
+from phyinc.main import output_info, validate_path
+from phyinc.io import unambiguous_dna_alphabet
 
 EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), '..', 'examples', 'synthetic_data')
 
@@ -26,69 +22,6 @@ class MockClade:
         self.name = name
         self.clades = clades or []
 
-
-# --- add_length ---
-
-def test_add_length_both_zero():
-    leaf_i = MockClade(0)
-    leaf_j = MockClade(0)
-    assert add_length(leaf_i, leaf_j) == 0.0
-
-
-def test_add_length_equal_branches():
-    leaf_i = MockClade(1.0)
-    leaf_j = MockClade(1.0)
-    result = add_length(leaf_i, leaf_j)
-    assert result == pytest.approx(0.5)
-
-
-def test_add_length_unequal_branches():
-    leaf_i = MockClade(1.0)
-    leaf_j = MockClade(3.0)
-    # (1*3)/(1+3) = 0.75
-    assert add_length(leaf_i, leaf_j) == pytest.approx(0.75)
-
-
-def test_add_length_one_zero_branch():
-    leaf_i = MockClade(0.0)
-    leaf_j = MockClade(2.0)
-    # (0*2)/(0+2) = 0
-    assert add_length(leaf_i, leaf_j) == pytest.approx(0.0)
-
-
-# --- set_seq ---
-
-def test_set_seq_both_zero_returns_matrix():
-    sentinel = np.zeros((4, 3))
-    leaf_i = MockClade(0)
-    leaf_j = MockClade(0)
-    result = set_seq(leaf_i, leaf_j, {}, sentinel)
-    assert result is sentinel
-
-
-def test_set_seq_equal_branches():
-    mat_i = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0],
-                      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-    mat_j = np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 0.0],
-                      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-    leaf_i = MockClade(1.0)
-    leaf_j = MockClade(1.0)
-    seq_dict = {leaf_i: mat_i, leaf_j: mat_j}
-    result = set_seq(leaf_i, leaf_j, seq_dict, np.zeros((4, 3)))
-    # With equal branch lengths l=r=1: (l/(l+r))*mat_j + (r/(l+r))*mat_i = 0.5*(mat_i+mat_j)
-    expected = 0.5 * (mat_i + mat_j)
-    np.testing.assert_array_almost_equal(result, expected)
-
-
-def test_set_seq_asymmetric_branches():
-    mat_i = np.ones((4, 3))
-    mat_j = np.zeros((4, 3))
-    leaf_i = MockClade(3.0)
-    leaf_j = MockClade(1.0)
-    seq_dict = {leaf_i: mat_i, leaf_j: mat_j}
-    result = set_seq(leaf_i, leaf_j, seq_dict, np.zeros((4, 3)))
-    # l=3, r=1: (l/(l+r))*mat_j + (r/(l+r))*mat_i = 0.75*zeros + 0.25*ones = 0.25
-    np.testing.assert_array_almost_equal(result, 0.25 * np.ones((4, 3)))
 
 
 # --- collapse_bifurcations ---
@@ -232,20 +165,5 @@ def test_compute_pic_array_values_sum_to_one():
     np.testing.assert_allclose(row_sums, np.ones(seq_length), atol=1e-6)
 
 
-# --- export_scores_to_file ---
-
-def test_export_scores_to_file_creates_file(tmp_path):
-    f = tmp_path / 'scores.txt'
-    export_scores_to_file('1.23 4.56', str(f))
-    assert f.read_text() == '1.23 4.56'
-
-
-def test_export_scores_to_file_existing_file(tmp_path, capsys):
-    f = tmp_path / 'scores.txt'
-    f.write_text('old')
-    export_scores_to_file('new', str(f))
-    captured = capsys.readouterr()
-    assert 'Already exists' in captured.out
-    assert f.read_text() == 'old'  # file unchanged
 
 

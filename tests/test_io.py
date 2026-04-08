@@ -2,35 +2,11 @@ import os
 import pytest
 from types import SimpleNamespace
 
-from phyinc.io import infer_sequence_type, match_alphabets, read_sequences, check_accession_consistency
-
-from weblogo.seq import (
-    protein_alphabet,
-    nucleic_alphabet,
-    dna_alphabet,
-    rna_alphabet,
-    reduced_nucleic_alphabet,
-    reduced_protein_alphabet,
-    unambiguous_dna_alphabet,
-    unambiguous_rna_alphabet,
-    unambiguous_protein_alphabet,
+from phyinc.io import (
+    infer_sequence_type, match_alphabets, read_sequences, check_accession_consistency,
+    dna_alphabets, rna_alphabets, protein_alphabets,
+    strip_domain_coords,
 )
-
-dna_alphabets = [
-    unambiguous_dna_alphabet,
-    reduced_nucleic_alphabet,
-    dna_alphabet,
-    nucleic_alphabet,
-]
-rna_alphabets = [
-    unambiguous_rna_alphabet,
-    rna_alphabet,
-]
-protein_alphabets = [
-    unambiguous_protein_alphabet,
-    reduced_protein_alphabet,
-    protein_alphabet,
-]
 
 SYNTHETIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'examples', 'synthetic_data')
 
@@ -209,3 +185,13 @@ def test_check_accession_consistency_names_listed_in_error():
     msg = str(exc_info.value)
     assert 'missing1' in msg
     assert 'missing2' in msg
+
+
+def test_strip_domain_coords():
+    assert strip_domain_coords('Hubba') == 'Hubba'
+    assert strip_domain_coords('Hubba_HUMAN') == 'Hubba_HUMAN'
+    assert strip_domain_coords('ABC123_MOUSE') == 'ABC123_MOUSE'
+
+    assert strip_domain_coords('Hubba/1-2') == 'Hubba'
+    assert strip_domain_coords('Hubba_HUMAN/100-102') == 'Hubba_HUMAN'
+    assert strip_domain_coords('ABC123_MOUSE/73-92') == 'ABC123_MOUSE'

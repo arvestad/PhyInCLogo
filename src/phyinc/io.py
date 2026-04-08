@@ -2,39 +2,62 @@ from Bio import SeqIO
 import logging
 import re
 
-from weblogo.colorscheme import hydrophobicity, nucleotide # Default color schemes
 
-from weblogo.seq import (
-#    generic_alphabet, # I do not want to use the generic alphabet — it allows _everything_
-    protein_alphabet,
-    nucleic_alphabet,
-    dna_alphabet,
-    rna_alphabet,
-    reduced_nucleic_alphabet,
-    reduced_protein_alphabet,
-    unambiguous_dna_alphabet,
-    unambiguous_rna_alphabet,
-    unambiguous_protein_alphabet,
-)
+domain_coord_pattern = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*)/(\d+)-(\d+)$')
+
+
+class Alphabet:
+    """Minimal alphabet for sequence type representation."""
+    def __init__(self, chars, name):
+        self._chars = chars
+        self.name = name
+
+    def letters(self):
+        return self._chars
+
+    def __len__(self):
+        return len(self._chars)
+
+    def __iter__(self):
+        return iter(self._chars)
+
+    def __contains__(self, c):
+        return c in self._chars
+
+    def __str__(self):
+        return self._chars
+
+    def __repr__(self):
+        return f'Alphabet({self._chars!r}, name={self.name!r})'
+
+
+unambiguous_dna_alphabet     = Alphabet('ACGT',                    'dna')
+dna_alphabet                 = Alphabet('ACGTRYSWKMBDHVN',         'dna')
+reduced_nucleic_alphabet     = Alphabet('ACGTU',                   'dna')
+nucleic_alphabet             = Alphabet('ACGTURYSWKMBDHVN',        'dna')
+unambiguous_rna_alphabet     = Alphabet('ACGU',                    'rna')
+rna_alphabet                 = Alphabet('ACGURYSWKMBDHVN',         'rna')
+unambiguous_protein_alphabet = Alphabet('ACDEFGHIKLMNPQRSTVWY',    'protein')
+reduced_protein_alphabet     = Alphabet('ACDEFGHIKLMNPQRSTVWYBXZ', 'protein')
+protein_alphabet             = Alphabet('ACDEFGHIKLMNPQRSTVWYBXZU*', 'protein')
+
 dna_alphabets = [
-        unambiguous_dna_alphabet,
-        reduced_nucleic_alphabet,
-        dna_alphabet,
-        nucleic_alphabet,
+    unambiguous_dna_alphabet,
+    reduced_nucleic_alphabet,
+    dna_alphabet,
+    nucleic_alphabet,
 ]
 rna_alphabets = [
-        unambiguous_rna_alphabet,
-        rna_alphabet,
+    unambiguous_rna_alphabet,
+    rna_alphabet,
 ]
 protein_alphabets = [
-        unambiguous_protein_alphabet,
-        reduced_protein_alphabet,
-        protein_alphabet,
+    unambiguous_protein_alphabet,
+    reduced_protein_alphabet,
+    protein_alphabet,
 ]
 
 all_alphabets = dna_alphabets + rna_alphabets + protein_alphabets
-
-domain_coord_pattern = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*)/(\d+)-(\d+)$')
 
 
 def match_alphabets(char_set, available_alphabets):
@@ -53,30 +76,43 @@ def infer_sequence_type(char_set, args):
     symbols, we will assume it is a protein sequence
     and the user will need to specify the sequence type.
 
-    We will also suggest a coloring scheme.
+    We will also suggest a logomaker color scheme string.
 
-    This is most likely not an ideal solution but will do for now.
-
-    Returns: an weblogo.Alphabet object and a coloring scheme.
+    Returns: an Alphabet object and a logomaker color scheme string.
     """
+    char_set = char_set - {'-', '.'}   # strip alignment gap characters
+
     if args.type == 'guess':           # User leaves it to us to choose
         choice = match_alphabets(char_set, all_alphabets)
+        if choice is not None and choice.name in ('dna', 'rna'):
+            return choice, 'classic'
+        choice = match_alphabets(char_set, protein_alphabets)
         if choice is not None:
-            return choice, nucleotide
-        choice = match_alphabets(char_set, unambiguous_rna_alphabet)
-        if choice is not None:
-            return choice, nucleotide
-        return match_alphabets(char_set, protein_alphabets), hydrophobicity
+            return choice, 'hydrophobicity'
+        unknown = ', '.join(sorted(char_set))
+        raise ValueError(f"Cannot determine sequence type — unrecognised characters: {unknown}")
 
     elif args.type == 'dna':
-        return match_alphabets(char_set, dna_alphabets), nucleotide
+        choice = match_alphabets(char_set, dna_alphabets)
+        if choice is None:
+            unknown = ', '.join(sorted(char_set - set(nucleic_alphabet)))
+            raise ValueError(f"Sequences declared as DNA but contain non-DNA characters: {unknown}")
+        return choice, 'classic'
     elif args.type == 'rna':
-        return match_alphabets(char_set, rna_alphabets), nucleotide
+        choice = match_alphabets(char_set, rna_alphabets)
+        if choice is None:
+            unknown = ', '.join(sorted(char_set - set(nucleic_alphabet)))
+            raise ValueError(f"Sequences declared as RNA but contain non-RNA characters: {unknown}")
+        return choice, 'classic'
     elif args.type == 'aa':
-        return match_alphabets(char_set, protein_alphabets), hydrophobicity
+        choice = match_alphabets(char_set, protein_alphabets)
+        if choice is None:
+            unknown = ', '.join(sorted(char_set - set(protein_alphabet)))
+            raise ValueError(f"Sequences declared as protein but contain unrecognised characters: {unknown}")
+        return choice, 'hydrophobicity'
     else:
         raise Exception("Bug in infer_sequence_type. Please report!")
-    
+
 
 def read_sequences(filename, filetype, args):
     """
@@ -115,6 +151,20 @@ def read_sequences(filename, filetype, args):
 
     seq_type, coloring_scheme = infer_sequence_type(characters, args)
     return seq_dict, seq_type, seq_length, coloring_scheme
+
+
+def strip_domain_coords(acc):
+    """
+    acc: a string containing a sequence accession, possibly with domain 
+         coordinates, such as 'ABC_HUMAN/73-122'.
+   
+    returns: same accession, but without domain coordinates.
+    """
+    m = domain_coord_pattern.match(acc)
+    if m:
+        return m[1]
+    else:
+        return acc
 
 
 def check_accession_consistency(seq_dict, tree, ignore_domain_coords=False):
@@ -159,4 +209,3 @@ def check_accession_consistency(seq_dict, tree, ignore_domain_coords=False):
 
     if messages:
         raise ValueError("\n".join(messages))
-
