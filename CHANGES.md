@@ -1,4 +1,19 @@
-2026-03-23: v1.1
+# Changes
+
+We use semantic versioning. 
+A new feature or other changes affecting users increases the "minor" number.
+Bug fixes increases the patch number.
+
+
+## 2026-03-24: v1.2
+
+- Added feature for exporting the data being used for seqlogo bars.
+- Some bug fixes.
+- Removed dead code.
+
+
+## 2026-03-23: v1.1
+
 - Changed the order of input files. Am considering it more likely that a user wants to write the
   sequence file first and tree file second.
 - Code improvements.
