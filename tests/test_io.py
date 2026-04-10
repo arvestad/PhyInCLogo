@@ -76,7 +76,7 @@ def test_infer_sequence_type_invalid_type():
 
 def test_read_sequences_returns_dict():
     fa_file = os.path.join(SYNTHETIC_DIR, 'ex1.fa')
-    args = SimpleNamespace(type='guess', coords=False)
+    args = SimpleNamespace(type='guess', ignore_coords=False)
     seq_dict, seq_type, seq_length, color_scheme = read_sequences(fa_file, 'fasta', args)
     assert isinstance(seq_dict, dict)
     assert len(seq_dict) > 0
@@ -86,7 +86,7 @@ def test_read_sequences_returns_dict():
 
 def test_read_sequences_all_accessions_present():
     fa_file = os.path.join(SYNTHETIC_DIR, 'ex1.fa')
-    args = SimpleNamespace(type='guess', coords=False)
+    args = SimpleNamespace(type='guess', ignore_coords=False)
     seq_dict, _, _, _ = read_sequences(fa_file, 'fasta', args)
     for name in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']:
         assert name in seq_dict
@@ -94,7 +94,7 @@ def test_read_sequences_all_accessions_present():
 
 def test_read_sequences_explicit_type():
     fa_file = os.path.join(SYNTHETIC_DIR, 'ex1.fa')
-    args = SimpleNamespace(type='aa', coords=False)
+    args = SimpleNamespace(type='aa', ignore_coords=False)
     seq_dict, seq_type, _, _ = read_sequences(fa_file, 'fasta', args)
     assert seq_type is not None
 
@@ -102,8 +102,8 @@ def test_read_sequences_explicit_type():
 def test_read_sequences_with_coords_no_domain_accessions():
     # ex1.fa has plain accessions (no /start-end), coords flag should have no extra effect
     fa_file = os.path.join(SYNTHETIC_DIR, 'ex1.fa')
-    args_no_coords = SimpleNamespace(type='guess', coords=False)
-    args_coords = SimpleNamespace(type='guess', coords=True)
+    args_no_coords = SimpleNamespace(type='guess', ignore_coords=False)
+    args_coords = SimpleNamespace(type='guess', ignore_coords=True)
     seq_dict_no, _, _, _ = read_sequences(fa_file, 'fasta', args_no_coords)
     seq_dict_yes, _, _, _ = read_sequences(fa_file, 'fasta', args_coords)
     assert set(seq_dict_no.keys()) == set(seq_dict_yes.keys())
@@ -112,7 +112,7 @@ def test_read_sequences_with_coords_no_domain_accessions():
 def test_read_sequences_with_domain_coords(tmp_path):
     fa = tmp_path / 'domain.fa'
     fa.write_text('>PROT1/10-19\nACDEFGHIKL\n>PROT2/20-29\nACDEFGHIKL\n')
-    args = SimpleNamespace(type='aa', coords=True)
+    args = SimpleNamespace(type='aa', ignore_coords=True)
     seq_dict, _, _, _ = read_sequences(str(fa), 'fasta', args)
     # Both full accession and stripped accession should be present
     assert 'PROT1/10-19' in seq_dict
@@ -124,7 +124,7 @@ def test_read_sequences_with_domain_coords(tmp_path):
 def test_read_sequences_inconsistent_length(tmp_path):
     fa = tmp_path / 'bad.fa'
     fa.write_text('>seq1\nACGT\n>seq2\nACGTT\n')
-    args = SimpleNamespace(type='dna', coords=False)
+    args = SimpleNamespace(type='dna', ignore_coords=False)
     with pytest.raises(Exception, match="inconsistent"):
         read_sequences(str(fa), 'fasta', args)
 

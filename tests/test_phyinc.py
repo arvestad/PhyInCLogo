@@ -138,7 +138,7 @@ def test_compute_pic_array_shape():
 
     fa_file = os.path.join(EXAMPLES_DIR, 'ex1.fa')
     tree_file = os.path.join(EXAMPLES_DIR, 'ex1_t1.tree')
-    args = SimpleNamespace(type='aa', coords=False)
+    args = SimpleNamespace(type='aa', ignore_coords=False)
     alignment, seq_type, seq_length, _ = phyinc_io.read_sequences(fa_file, 'fasta', args)
     tree = Phylo.read(tree_file, 'newick')
 
@@ -154,7 +154,7 @@ def test_compute_pic_array_values_sum_to_one():
 
     fa_file = os.path.join(EXAMPLES_DIR, 'ex1.fa')
     tree_file = os.path.join(EXAMPLES_DIR, 'ex1_t1.tree')
-    args = SimpleNamespace(type='aa', coords=False)
+    args = SimpleNamespace(type='aa', ignore_coords=False)
     alignment, seq_type, seq_length, _ = phyinc_io.read_sequences(fa_file, 'fasta', args)
     tree = Phylo.read(tree_file, 'newick')
 
