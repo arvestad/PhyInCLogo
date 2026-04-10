@@ -1,5 +1,6 @@
-This code stems from Haolin Guo's BSc thesis project. 
+Special thanks Haolin Guo, who wrote the first version of this project for 
+his BSc thesis project.
 
-Special thanks to Kyle Tenn for helping out making the code to a proper Python package.
+Thanks to Kyle Tenn for helping out making the code to a proper Python package.
 
-Thank you to the WebLogo authors for making their seq logo code reusable!
+Thank you to the Logomaker authors for a nice Python package!

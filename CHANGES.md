@@ -5,6 +5,12 @@ A new feature or other changes affecting users increases the "minor" number.
 Bug fixes increases the patch number.
 
 
+## 2026-04-10: v1.3
+
+- Changing to Logomaker as a backend. 
+- Quite a few general code improvements under the hood.
+
+
 ## 2026-03-24: v1.2
 
 - Added feature for exporting the data being used for seqlogo bars.
