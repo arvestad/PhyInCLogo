@@ -14,7 +14,7 @@ from phyinc.colorhelper import decide_color_scheme
 from phyinc.phyinc import create_logo, compute_pic_array
 
 
-output_formats = ["pdf", "eps", "png", "jpeg", "svg"]
+output_formats = ["pdf", "eps", "png", "jpg", "svg"]
 
 description_str = """
 Make sequence logos using Felsenstein's phylogenetically independent contrast
