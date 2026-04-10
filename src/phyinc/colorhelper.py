@@ -28,9 +28,9 @@ taylor = {
 # Maps --color-scheme argument values to logomaker color_scheme values.
 # Strings are logomaker built-ins; dicts are character-to-color mappings.
 color_lookup = {
-    'monochrome':     'gray',
+    'gray':           'gray',
     'nucleotide':     'classic',
-    'base_pairing':   'base_paring',   # logomaker spells it without the 'i'
+    'base_pairing':   'base_pairing',
     'hydrophobicity': 'hydrophobicity',
     'chemistry':      'chemistry',
     'charge':         'charge',

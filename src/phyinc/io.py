@@ -138,7 +138,7 @@ def read_sequences(filename, filetype, args):
 
         seq_str = seq_str.upper()
         characters.update(set(seq_str))
-        if args.coords:
+        if args.ignore_coords:
             m = domain_coord_pattern.match(acc) # Is acc on the form "HUBBA/17-35"?
             if m:
                 prot_acc, domain_start, domain_end = m.groups()

@@ -43,9 +43,10 @@ def setup_argparse():
         help="Color scheme. 'guess' picks based on sequence type. Default: %(default)s.",
     )
     parser.add_argument(
-        "--coords",
+        "-ic",
+        "--ignore-coords",
         action="store_true",
-        help="Strip domain coordinates (e.g. '/17-33') from accessions when matching to tree leaves.",
+        help="Ignore domain coordinates from accessions when matching to tree leaves. For example, if an accession is 'ABC_HUMAN/17-33' then '/17-33' is ignored.",
     )
     parser.add_argument(
         "-t",
@@ -189,7 +190,7 @@ def main():
     logging.info(f"Number of leaves: {tree.count_terminals()}")
 
     try:
-        io.check_accession_consistency(seq_dict, tree, args.coords)
+        io.check_accession_consistency(seq_dict, tree, args.ignore_coords)
     except ValueError as e:
         logging.error(e)
         sys.exit(4)

@@ -23,7 +23,7 @@ _seq_type_map = {
 _default_color_scheme = {
     'dna':     'classic',
     'rna':     'classic',
-    'protein': 'hydrophobicity',
+    'protein': 'chemistry',
 }
 
 
