@@ -1,161 +1,104 @@
-import argparse
-import logging
-import sys
-
 import numpy as np
 
 import matplotlib
-matplotlib.use("TkAgg")
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
-from pathlib import Path
+import logomaker
+import pandas as pd
+
 from Bio import Phylo
+from io import StringIO
 
 import phyinc.io as io
-from phyinc.colorhelper import decide_color_scheme
-from importlib.metadata import version
-
-from weblogo import LogoData, LogoOptions, LogoFormat, formatters as logo_formatters
+from phyinc.colorhelper import random_color_scheme
 
 
-output_formats = ["pdf", "eps", "png", "jpeg", "gif"]
-fineprint = "Created with PhyInC Logo + WebLogo"
-description_str = """
-Make sequence logos using Felsenstain's phylogenetically independent contrast metod to take evolution into account.
-"""
+_seq_type_map = {
+    'dna':     io.unambiguous_dna_alphabet,
+    'rna':     io.unambiguous_rna_alphabet,
+    'protein': io.unambiguous_protein_alphabet,
+}
 
-def setup_argparse():
-    # Apply PIC on tree file and corresbond Name-sequnce file, outputs 2 .png file(sequnce logo with and with out applying PIC).
-    parser = argparse.ArgumentParser(
-        description=description_str + f" Version {version('phyinc')}."
-    )
-    parser.add_argument(
-        "seq_filename",
-        type=str,
-        help="Path to the Fasta file. Assumes sequence name in the format of: ETA_STAAU/96-110",
-    )
-    parser.add_argument(
-        "tree_filename", type=str, help="Path to the .tree file (newick format)"
-    )
-    parser.add_argument(
-        "-c",
-        "--color-scheme",
-        choices=["monochrome", "nucleotide", "base_pairing", "hydrophobicity", "chemistry", "charge", "taylor", "guess"],
-        default="guess",
-        help="Choose color scheme. If using 'guess', then sequence type chooses between 'nucleotide' and 'taylor'."
-    )
-    parser.add_argument(
-        "--coords",
-        action="store_true",
-        help="Ignore domain coordinates in the sequence file when matching accessions to the treefile. I.e., for an accession like 'ACC/17-33' only 'ACC' is used."
-    )
-    parser.add_argument(
-        "-t",
-        "--type",
-        choices=["aa", "dna", "rna", "guess"],
-        default="guess",
-        help="Specify what sequence type to assume. Default: %(default)s")
-    parser.add_argument(
-        "-o",
-        "--outfile",
-        type=str,
-        help="Name of outfile. If this option is not used, it will be inferred from the sequence file. If the filename ends with .pdf, .png, or corresponding to another accepted format, that output format will be chosen.")
-    parser.add_argument(
-        "-f",
-        "--format",
-        choices=output_formats,
-        default="pdf",
-        help=f"Choose an output format, one of {output_formats}. This option is ignored if --outfile is used and a format is given in the filename.",
-    )
-    parser.add_argument(
-        "--export",
-        metavar="filename",
-        type=str,
-        help="Export the PIC-weighted frequency matrix as a tab-separated file and exit without producing a logo.",
-    )
-    parser.add_argument(
-        "-n",
-        "--no-fineprint",
-        action="store_true",
-        help=f'Do not add a string indicating what software produced the logo ("{fineprint}")',
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help=f"Write more information to stderr",
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"phyinc version {version('phyinc')}"
-    )
-
-    return parser
+_default_color_scheme = {
+    'dna':     'classic',
+    'rna':     'classic',
+    'protein': 'hydrophobicity',
+}
 
 
-def output_info(args):
+def create_logo(alignment, tree, seq_type, color_scheme='guess', bar_width=None, max_bar_height=None, title=None):
     """
-    Figure out what file to write logo to and what format to use.
-    Returns the pair `filename`, `formatter` and ensures they make sense together.
-    The formatter converts logo data to a picture.
+    Compute a PIC-weighted sequence logo and return it as a matplotlib Figure.
+
+    Parameters
+    ----------
+    alignment : Bio.Align.MultipleSeqAlignment
+        Multiple sequence alignment; record IDs must match tree leaf labels.
+    tree : Bio.Phylo.BaseTree.Tree
+        Rooted phylogenetic tree.
+    seq_type : str
+        One of 'dna', 'rna', or 'protein'.
+    color_scheme : str
+        Logomaker color scheme string, or 'guess' to pick based on seq_type.
+        Default: 'guess'.
+    bar_width : float, optional
+        Width of each position column in inches.
+    max_bar_height : float, optional
+        Y-axis ceiling in bits.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
     """
-    if args.outfile:
-        outfile = Path(args.outfile)
-        graphics_format = outfile.suffix.strip(".")
-        if not graphics_format:
-            raise ValueError(
-                f"Give your outfile a suffix that determines output format, one of {output_formats}"
-            )
-        if not graphics_format in output_formats:
-            raise ValueError(
-                f'"{graphics_format}" is not a valid output format. Use one of {output_formats}.'
-            )
+    if seq_type not in _seq_type_map:
+        raise ValueError(f"seq_type must be one of {list(_seq_type_map)}, got {seq_type!r}")
+    alphabet = _seq_type_map[seq_type]
+
+    if color_scheme == 'guess':
+        color_scheme = _default_color_scheme[seq_type]
+    elif color_scheme == 'random':
+        color_scheme = random_color_scheme(alphabet.letters())
+
+    if isinstance(alignment, dict):
+        seq_dict = alignment
+        seq_length = len(next(iter(seq_dict.values())).seq)
     else:
-        graphics_format = "pdf"  # Good default
-        if args.format:
-            graphics_format = (
-                args.format
-            )  # If argparse accepted the string, then it is good
+        seq_dict = {record.id: record for record in alignment}
+        seq_length = alignment.get_alignment_length()
 
-        outfile = args.seq_filename + "_logo." + graphics_format
+    array = compute_pic_array(tree, seq_dict, alphabet, seq_length)
 
-    return outfile, logo_formatters[graphics_format]
+    df = pd.DataFrame(array, columns=list(alphabet.letters()))
+
+    # Schneider & Stephens (1990) gap correction:
+    # row sums give the PIC-weighted non-gap fraction at each position.
+    non_gap_weight = df.sum(axis=1)
+    df = df.div(non_gap_weight, axis=0)          # conditional probabilities (given non-gap)
+    df = logomaker.transform_matrix(df, from_type='probability', to_type='information')
+    df = df.mul(non_gap_weight, axis=0)          # scale IC by non-gap fraction
+
+    col_width = bar_width if bar_width is not None else 0.4
+    fig_width = max(4, seq_length * col_width)
+    fig, ax = plt.subplots(figsize=(fig_width, 2.5))
+
+    logomaker.Logo(df, ax=ax, color_scheme=color_scheme)
+    ax.set_xlabel('Position')
+    ax.set_ylabel('Information content (bits)')
+
+    if max_bar_height is not None:
+        ax.set_ylim(0, max_bar_height)
+
+    if title is not None:
+        ax.set_title(title)
+
+    plt.tight_layout()
+    return fig
 
 
 def convert_matrix_to_array(matrix, seq_type, seq_length):
-    array = []
-    for i in range(0, seq_length):
-        sub_array = []
-        for c in seq_type:
-            sub_array.append(matrix[seq_type.letters().index(c)][i])
-        array.append(sub_array)
-    return np.array(array)
+    return matrix.T
 
-
-
-def set_seq(leaf_i, leaf_j, seq_dict, zero_matrix):
-    """Calculate frequency matrix (x_i) for parent node"""
-    # TODO: choose better function name
-    l = float(leaf_i.branch_length)
-    r = float(leaf_j.branch_length)
-    if (l == 0) and (r == 0):
-        return zero_matrix
-    else:
-        seq_matrix = np.add(
-            (l / (l + r)) * seq_dict[leaf_j],
-            (r / (l + r)) * seq_dict[leaf_i],
-        )
-        return seq_matrix
-
-
-def add_length(leaf_i, leaf_j):
-    """calculate new branch length (v_i') for parent node"""
-    l = float(leaf_i.branch_length)
-    r = float(leaf_j.branch_length)
-    if (l == 0) and (r == 0):
-        return float(0)
-    else:
-        return (l * r) / (l + r)
 
 
 def collapse_bifurcations(children, seq_dict, zero_matrix):
@@ -207,7 +150,7 @@ def collapse_bifurcations(children, seq_dict, zero_matrix):
 def compute_pic_array(tree, alignment, seq_type, seq_length):
     """
     Run the PIC traversal and return the frequency array with shape
-    (seq_length, n_chars), ready for use with WebLogo or export.
+    (seq_length, n_chars), ready for use with Logomaker or export.
     """
     zero_matrix = np.zeros((len(seq_type), seq_length), dtype=float)
     seq_dict = {}
@@ -217,150 +160,17 @@ def compute_pic_array(tree, alignment, seq_type, seq_length):
     return convert_matrix_to_array(seq_matrix, seq_type, seq_length)
 
 
-def pic_seqlogo(tree, logo_formatter, color_scheme, args, alignment, seq_type, seq_length):
-    array = compute_pic_array(tree, alignment, seq_type, seq_length)
-
-    logo_data = LogoData.from_counts(alphabet=seq_type, counts=array)
-    logo_options = LogoOptions()
-
-    if args.no_fineprint:
-        logo_options.show_fineprint = False
-    else:
-        # add the fine print
-        logo_options.fineprint = fineprint
-
-    logo_options.color_scheme = color_scheme
-    logo_options.stack_width = 50  # increase width of each position
-    logo_options.stack_height = 100  # increase overall height
-
-    logo_format = LogoFormat(logo_data, logo_options)
-    return logo_formatter(logo_data, logo_format)
-
-
 def traverse_postorder(clade, alignment, seq_type, zero_matrix, seq_dict):
-    if len(clade) == 0:  # only tips of the tree will have length 0
-        clade.seq = str(
-            alignment[clade.name].seq
-        )  # store str(sequences) as an attribute for the clade object (of biopython package).
-
-        seq_matrix = zero_matrix.copy()  # make a copy of the default sequence matrix
-        for i in range(0, len(clade.seq)):
-            character_index = seq_type.letters().index(clade.seq[i].upper())
-            seq_matrix[character_index, i] = float(
-                1
-            )  # a count matrix for each individual leaf, used later to calculate frequency matrix for parent nodes
-
-        seq_dict[clade] = seq_matrix  # stores the matrix to dictionary
-    else:  # a parent node, because len(clade) > 0
+    if len(clade) == 0:  # leaf
+        seq = str(alignment[clade.name].seq)
+        seq_matrix = zero_matrix.copy()
+        for i, char in enumerate(seq.upper()):
+            if char not in ('-', '.'):
+                seq_matrix[seq_type.letters().index(char), i] = 1.0
+        seq_dict[clade] = seq_matrix
+    else:  # internal node
         for child in clade:
             traverse_postorder(child, alignment, seq_type, zero_matrix, seq_dict)
-        if len(clade) == 2:
-            clade.branch_length = float(clade.branch_length) + add_length(
-                clade[0], clade[1]
-            )
-            seq_dict[clade] = set_seq(clade[0], clade[1], seq_dict, zero_matrix)
-        else:
-            branch_length, seq_matrix = collapse_bifurcations(clade, seq_dict, zero_matrix)
-            clade.branch_length = float(clade.branch_length) + branch_length
-            seq_dict[clade] = seq_matrix
-
-
-def validate_path(filename):
-    path = Path(filename)
-    if not path.is_file():
-        raise FileNotFoundError(f"Cannot open {filename}.")
-    return path
-
-
-def export_pic_data(tree, alignment, seq_type, seq_length, filename):
-    """
-    Compute the PIC-weighted frequency matrix and write it as a
-    tab-separated file (one row per alignment position, one column per
-    character).  Raises SystemExit on any error so callers get a clean
-    error message rather than a traceback.
-    """
-    try:
-        array = compute_pic_array(tree, alignment, seq_type, seq_length)
-    except Exception as e:
-        print(f"Error computing PIC data: {e}", file=sys.stderr)
-        sys.exit(4)
-
-    header = '\t'.join(seq_type.letters())
-    try:
-        with open(filename, 'w') as f:
-            f.write(header + '\n')
-            for row in array:
-                f.write('\t'.join(f'{v:.6f}' for v in row) + '\n')
-    except OSError as e:
-        print(f"Error writing to '{filename}': {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-def main():
-    # Set up argument parser
-    ap = setup_argparse()
-    args = ap.parse_args()
-
-    if args.verbose:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="phyinc: %(message)s",
-        )
-
-    try:
-        tree_file = validate_path(args.tree_filename)
-        seq_file = validate_path(args.seq_filename)
-    except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    outfilename, logo_artist = output_info(args)  # Infer details before computing
-
-    try:
-        tree = Phylo.read(tree_file, "newick")
-    except IOError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(5)
-
-    try:
-        alignment, seq_type, seq_length, color_scheme = io.read_sequences(seq_file, "fasta", args)
-    except IOError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(3)
-    except KeyError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(2)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(4)
-
-    logging.info(f"Alignment width:  {seq_length}")
-    logging.info(f"Sequence type:    {seq_type}")
-    logging.info(f"Number of leaves: {tree.count_terminals()}")
-
-    try:
-        io.check_accession_consistency(alignment, tree, args.coords)
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(4)
-
-    color_scheme = decide_color_scheme(args, color_scheme)
-
-    if args.export:
-        export_pic_data(tree, alignment, seq_type, seq_length, args.export)
-        sys.exit(0)
-
-    try:
-        logo = pic_seqlogo(tree, logo_artist, color_scheme, args,
-                           alignment, seq_type, seq_length)
-        with open(outfilename, "wb") as out:
-            out.write(logo)
-    except KeyError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(2)
-        
-
-
-if __name__ == "__main__":
-    main()
-        
+        branch_length, seq_matrix = collapse_bifurcations(clade, seq_dict, zero_matrix)
+        clade.branch_length = float(clade.branch_length) + branch_length
+        seq_dict[clade] = seq_matrix
