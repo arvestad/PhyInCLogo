@@ -35,10 +35,16 @@ def setup_argparse():
         "tree_filename", type=str, help="Path to the tree file (Newick format)."
     )
     parser.add_argument(
+        "-ed",
+        action="store_true",
+        dest="ed",
+        help="Weight sequences by fair proportion evolutionary distinctiveness (Isaac et al. 2007) instead of phylogenetically independent contrasts.",
+    )
+    parser.add_argument(
         "-c",
         "--color-scheme",
         choices=["monochrome", "nucleotide", "base_pairing", "hydrophobicity",
-                 "chemistry", "charge", "taylor", "random", "guess"],
+                 "chemistry", "charge", "taylor", "wesanderson", "random", "guess"],
         default="guess",
         help="Color scheme. 'guess' picks based on sequence type. Default: %(default)s.",
     )
@@ -72,13 +78,20 @@ def setup_argparse():
         "--export",
         metavar="filename",
         type=str,
-        help="Write the PIC-weighted frequency matrix to a tab-separated file and exit.",
+        help="Write the weighted frequency matrix to a tab-separated file and exit.",
     )
     parser.add_argument(
         "--title",
         type=str,
         default=None,
         help="Title to display above the logo.",
+    )
+    parser.add_argument(
+        "-nc",
+        "--no-commandline",
+        action="store_true",
+        dest="no_commandline",
+        help="Do not show the phyinc command line beneath the logo.",
     )
     parser.add_argument(
         "-v",
@@ -202,7 +215,14 @@ def main():
         sys.exit(0)
 
     try:
-        fig = create_logo(seq_dict, tree, seq_type.name, color_scheme=color_scheme, title=args.title)
+        method = 'pic'
+        if args.ed:
+            method = 'ed'
+        executable = Path(sys.argv[0]).name # Get rid of full path
+        command_line = executable + ' ' + ' '.join(sys.argv[1:])
+        if args.no_commandline:
+            command_line = None
+        fig = create_logo(seq_dict, tree, seq_type.name, color_scheme=color_scheme, title=args.title, method=method, footnote=command_line)
         fig.savefig(outfilename, format=graphics_format)
         plt.close(fig)
     except Exception as e:

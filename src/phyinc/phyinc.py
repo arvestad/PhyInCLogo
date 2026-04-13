@@ -27,7 +27,7 @@ _default_color_scheme = {
 }
 
 
-def create_logo(alignment, tree, seq_type, color_scheme='guess', bar_width=None, max_bar_height=None, title=None):
+def create_logo(alignment, tree, seq_type, color_scheme='guess', bar_width=None, max_bar_height=None, title=None, method='pic', footnote=None):
     """
     Compute a PIC-weighted sequence logo and return it as a matplotlib Figure.
 
@@ -67,7 +67,10 @@ def create_logo(alignment, tree, seq_type, color_scheme='guess', bar_width=None,
         seq_dict = {record.id: record for record in alignment}
         seq_length = alignment.get_alignment_length()
 
-    array = compute_pic_array(tree, seq_dict, alphabet, seq_length)
+    if method == 'ed':
+        array = compute_ed_array(seq_dict, tree, alphabet, seq_length)
+    else:
+        array = compute_pic_array(tree, seq_dict, alphabet, seq_length)
 
     df = pd.DataFrame(array, columns=list(alphabet.letters()))
 
@@ -91,6 +94,10 @@ def create_logo(alignment, tree, seq_type, color_scheme='guess', bar_width=None,
 
     if title is not None:
         ax.set_title(title)
+
+    if footnote is not None:
+        fig.text(0.5, 0.01, footnote, ha='center', va='bottom',
+                 fontsize=6, color='gray', transform=fig.transFigure)
 
     plt.tight_layout()
     return fig
@@ -145,6 +152,49 @@ def collapse_bifurcations(children, seq_dict, zero_matrix):
                 )
             )
     return branch_length_temp[0], seq_matrix_temp[0]
+
+
+def compute_ed_weights(tree):
+    """
+    Compute fair proportion evolutionary distinctiveness (ED) for every leaf.
+
+    Each branch of length l with n descendant leaves contributes l/n to the
+    ED score of each of those leaves (Isaac et al. 2007).
+
+    Returns a dict {leaf_name: normalised_weight} that sums to 1.
+    """
+    ed = {leaf.name: 0.0 for leaf in tree.get_terminals()}
+
+    for clade in tree.find_clades():
+        if not clade.branch_length:
+            continue
+        leaves = [c.name for c in clade.get_terminals()]
+        share = clade.branch_length / len(leaves)
+        for name in leaves:
+            ed[name] += share
+
+    total = sum(ed.values())
+    if total == 0:
+        raise ValueError("Tree has no branch lengths; cannot compute evolutionary distinctiveness.")
+    return {name: score / total for name, score in ed.items()}
+
+
+def compute_ed_array(alignment, tree, seq_type, seq_length):
+    """
+    Compute a fair-proportion ED-weighted frequency array with shape
+    (seq_length, n_chars).
+    """
+    weights = compute_ed_weights(tree)
+    matrix = np.zeros((len(seq_type), seq_length), dtype=float)
+
+    for leaf in tree.get_terminals():
+        w = weights[leaf.name]
+        seq = str(alignment[leaf.name].seq)
+        for i, char in enumerate(seq.upper()):
+            if char not in ('-', '.'):
+                matrix[seq_type.letters().index(char), i] += w
+
+    return matrix.T
 
 
 def compute_pic_array(tree, alignment, seq_type, seq_length):
