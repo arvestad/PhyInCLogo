@@ -25,6 +25,31 @@ taylor = {
     'T': '#FF6600', 'V': '#99FF00', 'W': '#00CCFF', 'Y': '#00FFCC',
 }
 
+# The Wes Anderson palette is borrowed from the R package 'wesanderson'
+# with the help from Claude Code.
+wes_anderson = {                
+    'A': "#02401B",  # 16 Jungle bottle      — Darjeeling Ltd.
+    'C': "#7294D4",  # 5  Concierge blue     — Grand Budapest
+    'D': "#FD6467",  # 1  Futura red         — Grand Budapest
+    'E': "#F1BB7B",  # 2  Mendl's peach      — Grand Budapest
+    'F': "#5B1A18",  # 3  Lobby maroon       — Grand Budapest
+    'G': "#D8B70A",  # 15 Saffron road       — Darjeeling Ltd.
+    'H': "#3B9AB2",  # 6  Zissou sea         — Life Aquatic
+    'I': "#35274A",  # 7  Blume purple       — Rushmore
+    'K': "#F21A00",  # 8  Jaguar orange      — Life Aquatic
+    'L': "#F3DF6C",  # 9  Moonrise gold      — Moonrise Kingdom
+    'M': "#85D4E3",  # 10 Island sky         — Moonrise Kingdom
+    'N': "#9C964A",  # 11 Tent khaki         — Moonrise Kingdom
+    'P': "#899DA4",  # 12 Tenenbaum slate    — Royal Tenenbaums
+    'Q': "#A2A475",  # 17 Dusty sage         — Darjeeling Ltd.
+    'R': "#DC863B",  # 14 Etheline amber     — Royal Tenenbaums
+    'S': "#E6A0C4",  # 4  Agatha pink        — Grand Budapest
+    'T': "#C93312",  # 13 Richie's headband  — Royal Tenenbaums
+    'V': "#46ACC8",  # 18 Fox sky cyan       — Fantastic Mr. Fox
+    'W': "#6C6F39",  # 19 Autumn olive       — Fantastic Mr. Fox
+    'Y': "#446455",  # 20 Chevalier pine     — The Chevalier
+}
+
 # Maps --color-scheme argument values to logomaker color_scheme values.
 # Strings are logomaker built-ins; dicts are character-to-color mappings.
 color_lookup = {
@@ -35,6 +60,7 @@ color_lookup = {
     'chemistry':      'chemistry',
     'charge':         'charge',
     'taylor':         taylor,
+    'wesanderson':    wes_anderson,
     'random':         'random',
 }
 
