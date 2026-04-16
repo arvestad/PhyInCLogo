@@ -5,6 +5,12 @@ A new feature or other changes affecting users increases the "minor" number.
 Bug fixes increases the patch number.
 
 
+## 2026-04-16: v1.4
+- Added two more methods of weighting: Evolutionary Distinctivness (ED) and a balance 
+  criteria (currently named "yule").
+- Added Skylign colors
+
+
 ## 2026-04-10: v1.3
 
 - Changing to Logomaker as a backend. 
