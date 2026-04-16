@@ -45,9 +45,41 @@ wes_anderson = {
     'R': "#DC863B",  # 14 Etheline amber     — Royal Tenenbaums
     'S': "#E6A0C4",  # 4  Agatha pink        — Grand Budapest
     'T': "#C93312",  # 13 Richie's headband  — Royal Tenenbaums
+    'U': "#C93312",
     'V': "#46ACC8",  # 18 Fox sky cyan       — Fantastic Mr. Fox
     'W': "#6C6F39",  # 19 Autumn olive       — Fantastic Mr. Fox
     'Y': "#446455",  # 20 Chevalier pine     — The Chevalier
+}
+
+skylign_aa_colors = {
+    'A': '#FF9966',
+    'C': '#009999',
+    'D': '#FF0000',
+    'E': '#CC0033',
+    'F': '#00FF00',
+    'G': '#F2F20C',
+    'H': '#660033',
+    'I': '#CC9933',
+    'K': '#663300',
+    'L': '#FF9933',
+    'M': '#CC99CC',
+    'N': '#336666',
+    'P': '#0099FF',
+    'Q': '#6666CC',
+    'R': '#990000',
+    'S': '#0000FF',
+    'T': '#00FFFF',
+    'V': '#FFCC33',
+    'W': '#66CC66',
+    'Y': '#006600',
+}
+
+skylign_dna_colors = {
+    'A': '#CBF751',
+    'C': '#5EC0CC',
+    'G': '#FFDF59',
+    'T': '#B51F16',
+    'U': '#B51F16',
 }
 
 # Maps --color-scheme argument values to logomaker color_scheme values.
@@ -61,6 +93,8 @@ color_lookup = {
     'charge':         'charge',
     'taylor':         taylor,
     'wesanderson':    wes_anderson,
+    'skylign_aa':     skylign_aa_colors,
+    'skylign_dna':    skylign_dna_colors,
     'random':         'random',
 }
 
