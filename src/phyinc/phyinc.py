@@ -69,6 +69,8 @@ def create_logo(alignment, tree, seq_type, color_scheme='guess', bar_width=None,
 
     if method == 'ed':
         array = compute_ed_array(seq_dict, tree, alphabet, seq_length)
+    elif method == 'yule':
+        array = compute_yule_array(seq_dict, tree, alphabet, seq_length)
     else:
         array = compute_pic_array(tree, seq_dict, alphabet, seq_length)
 
@@ -92,10 +94,10 @@ def create_logo(alignment, tree, seq_type, color_scheme='guess', bar_width=None,
     if max_bar_height is not None:
         ax.set_ylim(0, max_bar_height)
 
-    if title is not None:
+    if title:
         ax.set_title(title)
 
-    if footnote is not None:
+    if footnote:
         fig.text(0.5, 0.01, footnote, ha='center', va='bottom',
                  fontsize=6, color='gray', transform=fig.transFigure)
 
@@ -137,15 +139,19 @@ def collapse_bifurcations(children, seq_dict, zero_matrix):
                     / (leaf_i_branch_length + leaf_j_branch_length)
                 )
             )
+            # Felsenstein (1985): each child is weighted by the OTHER child's
+            # branch length. Under Brownian motion, precision = 1/branch_length,
+            # so a short branch → high precision → high weight. The normalised
+            # weight for child i is therefore b_j / (b_i + b_j).
             seq_matrix_temp.append(
                 np.add(
                     (
-                        leaf_i_branch_length
+                        leaf_j_branch_length
                         / (leaf_i_branch_length + leaf_j_branch_length)
                     )
                     * leaf_i_seq_matrix,
                     (
-                        leaf_j_branch_length
+                        leaf_i_branch_length
                         / (leaf_i_branch_length + leaf_j_branch_length)
                     )
                     * leaf_j_seq_matrix,
@@ -179,6 +185,69 @@ def compute_ed_weights(tree):
     return {name: score / total for name, score in ed.items()}
 
 
+def compute_yule_weights(tree) -> dict:
+    """
+    Compute normalized Yule-model sequence weights for all leaves.
+
+    For each leaf, walk from root to leaf and multiply correction factors at
+    each internal node:
+
+        w_i = prod_{v in path(root -> leaf_i)} k(v) / (2 * k_f(v))
+
+    where k(v) is the total number of leaves below node v and k_f(v) is the
+    number of leaves in the daughter clade of v that contains leaf i.
+
+    Topology-based (branch lengths ignored). Weights are normalized to sum to 1.
+    Uniform weights on a balanced tree; isolated leaves on a caterpillar tree
+    receive the highest weights.
+
+    Returns a dict {leaf_name: normalised_weight}.
+    """
+    root = tree.root
+
+    def _count_leaves(clade):
+        return sum(1 for _ in clade.get_terminals())
+
+    raw = {}
+    for leaf in tree.get_terminals():
+        path = tree.get_path(leaf)          # root's children → leaf
+        nodes = [root] + list(path[:-1])    # include root, exclude leaf itself
+
+        w = 1.0
+        for node in nodes:
+            if node.is_terminal():
+                continue
+            k_total = _count_leaves(node)
+            for child in node.clades:
+                if leaf in child.get_terminals() or child == leaf:
+                    k_focal = _count_leaves(child)
+                    break
+            w *= k_total / (2.0 * k_focal)
+
+        raw[leaf.name] = w
+
+    total = sum(raw.values())
+    return {name: w / total for name, w in raw.items()}
+
+
+def compute_yule_array(alignment, tree, seq_type, seq_length):
+    """
+    Compute a Yule-model-weighted frequency array with shape
+    (seq_length, n_chars).
+    """
+    weights = compute_yule_weights(tree)
+    matrix = np.zeros((len(seq_type), seq_length), dtype=float)
+
+    for leaf in tree.get_terminals():
+        w = weights[leaf.name]
+        seq = str(alignment[leaf.name].seq)
+        for i, char in enumerate(seq.upper()):
+            if char not in ('-', '.'):
+                matrix[seq_type.letters().index(char), i] += w
+
+    return matrix.T
+
+
 def compute_ed_array(alignment, tree, seq_type, seq_length):
     """
     Compute a fair-proportion ED-weighted frequency array with shape
@@ -202,6 +271,8 @@ def compute_pic_array(tree, alignment, seq_type, seq_length):
     Run the PIC traversal and return the frequency array with shape
     (seq_length, n_chars), ready for use with Logomaker or export.
     """
+    if all(c.branch_length is None for c in tree.find_clades() if not c.is_terminal()):
+        raise ValueError("Tree has no branch lengths; cannot compute phylogenetically independent contrasts.")
     zero_matrix = np.zeros((len(seq_type), seq_length), dtype=float)
     seq_dict = {}
     for child in tree.clade:
