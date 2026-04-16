@@ -11,7 +11,7 @@ from importlib.metadata import version
 
 import phyinc.io as io
 from phyinc.colorhelper import decide_color_scheme
-from phyinc.phyinc import create_logo, compute_pic_array
+from phyinc.phyinc import create_logo, compute_pic_array, compute_ed_array, compute_yule_array
 
 
 output_formats = ["pdf", "eps", "png", "jpg", "svg"]
@@ -35,16 +35,23 @@ def setup_argparse():
         "tree_filename", type=str, help="Path to the tree file (Newick format)."
     )
     parser.add_argument(
-        "-ed",
-        action="store_true",
-        dest="ed",
-        help="Weight sequences by fair proportion evolutionary distinctiveness (Isaac et al. 2007) instead of phylogenetically independent contrasts.",
+        "-w",
+        "--weighting",
+        choices=["pic", "ed", "yule"],
+        default="pic",
+        dest="weighting",
+        help=(
+            "Sequence weighting method. "
+            "'pic': phylogenetically independent contrasts (Felsenstein 1985, default); "
+            "'ed': fair proportion evolutionary distinctiveness (Isaac et al. 2007); "
+            "'yule': Yule-model topology weights."
+        ),
     )
     parser.add_argument(
         "-c",
         "--color-scheme",
         choices=["monochrome", "nucleotide", "base_pairing", "hydrophobicity",
-                 "chemistry", "charge", "taylor", "wesanderson", "random", "guess"],
+                 "chemistry", "charge", "taylor", "wesanderson", "skylign_aa", "skylign_dna", "random", "guess"],
         default="guess",
         help="Color scheme. 'guess' picks based on sequence type. Default: %(default)s.",
     )
@@ -87,11 +94,10 @@ def setup_argparse():
         help="Title to display above the logo.",
     )
     parser.add_argument(
-        "-nc",
-        "--no-commandline",
+        "-cl",
+        "--command-line",
         action="store_true",
-        dest="no_commandline",
-        help="Do not show the phyinc command line beneath the logo.",
+        help="Show the phyinc command line beneath the logo, ie how phyinc was called.",
     )
     parser.add_argument(
         "-v",
@@ -137,14 +143,20 @@ def validate_path(filename):
     return path
 
 
-def export_pic_data(tree, alignment, seq_type, seq_length, filename):
+def export_weighted_data(tree, alignment, seq_type, seq_length, filename, method='pic'):
     """
-    Write the PIC-weighted frequency matrix as a tab-separated file.
+    Write the weighted frequency matrix as a tab-separated file.
+    The weighting method is selected by the method argument ('pic', 'ed', or 'yule').
     """
     try:
-        array = compute_pic_array(tree, alignment, seq_type, seq_length)
+        if method == 'ed':
+            array = compute_ed_array(alignment, tree, seq_type, seq_length)
+        elif method == 'yule':
+            array = compute_yule_array(alignment, tree, seq_type, seq_length)
+        else:
+            array = compute_pic_array(tree, alignment, seq_type, seq_length)
     except Exception as e:
-        print(f"Error computing PIC data: {e}", file=sys.stderr)
+        print(f"Error computing weighted frequency data: {e}", file=sys.stderr)
         sys.exit(4)
 
     header = '\t'.join(seq_type.letters())
@@ -210,18 +222,18 @@ def main():
 
     color_scheme = decide_color_scheme(args, guessed_color)
 
+    method = args.weighting
+
     if args.export:
-        export_pic_data(tree, seq_dict, seq_type, seq_length, args.export)
+        export_weighted_data(tree, seq_dict, seq_type, seq_length, args.export, method)
         sys.exit(0)
 
     try:
-        method = 'pic'
-        if args.ed:
-            method = 'ed'
         executable = Path(sys.argv[0]).name # Get rid of full path
-        command_line = executable + ' ' + ' '.join(sys.argv[1:])
-        if args.no_commandline:
-            command_line = None
+        if args.command_line:
+            command_line = executable + ' ' + ' '.join(sys.argv[1:])
+        else:
+            command_line = ''
         fig = create_logo(seq_dict, tree, seq_type.name, color_scheme=color_scheme, title=args.title, method=method, footnote=command_line)
         fig.savefig(outfilename, format=graphics_format)
         plt.close(fig)
